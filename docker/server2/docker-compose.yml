@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  server2:
+    build:
+      context: ../..
+      dockerfile: docker/server2/Dockerfile
+    image: rdp-msa/server2:latest
+    container_name: rdp-server2
+    hostname: server2
+    ports:
+      - "8090:8090"   # Regulatory Service
+      - "8083:8083"   # Ingestion Service (forex)
+    environment:
+      - JAVA_OPTS=-Xmx384m -Xms192m
+      - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
+      - SERVER_ID=server2
+    networks:
+      - rdp-network
+    volumes:
+      - server2-logs:/var/log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  server2-logs:
+
+networks:
+  rdp-network:
+    external: true

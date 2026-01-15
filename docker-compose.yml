@@ -1,0 +1,132 @@
+version: '3.8'
+
+# Full Stack Docker Compose
+# This file orchestrates all 4 servers in a single deployment
+
+services:
+  # Server 1: Eureka (primary), Ingestion (equity), RefData, Eligibility
+  server1:
+    build:
+      context: .
+      dockerfile: docker/server1/Dockerfile
+    image: rdp-msa/server1:latest
+    container_name: rdp-server1
+    hostname: server1
+    ports:
+      - "8088:8088"   # Eureka Server
+      - "8082:8082"   # Ingestion Service (equity)
+      - "8081:8081"   # RefData Service
+      - "8092:8092"   # Eligibility Service
+    environment:
+      - JAVA_OPTS=-Xmx512m -Xms256m
+      - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
+      - SERVER_ID=server1
+    networks:
+      - rdp-network
+    volumes:
+      - server1-logs:/var/log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+
+  # Server 2: Regulatory, Ingestion (forex)
+  server2:
+    build:
+      context: .
+      dockerfile: docker/server2/Dockerfile
+    image: rdp-msa/server2:latest
+    container_name: rdp-server2
+    hostname: server2
+    ports:
+      - "8090:8090"   # Regulatory Service
+      - "8083:8083"   # Ingestion Service (forex)
+    environment:
+      - JAVA_OPTS=-Xmx384m -Xms192m
+      - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
+      - SERVER_ID=server2
+    networks:
+      - rdp-network
+    volumes:
+      - server2-logs:/var/log
+    depends_on:
+      server1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # Server 3: RefData, Ingestion (irswap), Eligibility
+  server3:
+    build:
+      context: .
+      dockerfile: docker/server3/Dockerfile
+    image: rdp-msa/server3:latest
+    container_name: rdp-server3
+    hostname: server3
+    ports:
+      - "18081:8081"  # RefData Service
+      - "18082:8082"  # Ingestion Service (irswap)
+      - "18092:8092"  # Eligibility Service
+    environment:
+      - JAVA_OPTS=-Xmx512m -Xms256m
+      - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
+      - SERVER_ID=server3
+    networks:
+      - rdp-network
+    volumes:
+      - server3-logs:/var/log
+    depends_on:
+      server1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # Server 4: Eureka (secondary), Ingestion (supporteventhandler)
+  server4:
+    build:
+      context: .
+      dockerfile: docker/server4/Dockerfile
+    image: rdp-msa/server4:latest
+    container_name: rdp-server4
+    hostname: server4
+    ports:
+      - "18088:8088"  # Eureka Server
+      - "8084:8084"   # Ingestion Service (supporteventhandler)
+    environment:
+      - JAVA_OPTS=-Xmx384m -Xms192m
+      - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
+      - SERVER_ID=server4
+    networks:
+      - rdp-network
+    volumes:
+      - server4-logs:/var/log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+
+volumes:
+  server1-logs:
+  server2-logs:
+  server3-logs:
+  server4-logs:
+
+networks:
+  rdp-network:
+    driver: bridge

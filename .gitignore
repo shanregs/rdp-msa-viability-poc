@@ -1,0 +1,179 @@
+    # ===========================
+# Java / Maven
+# ===========================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+logs/
+
+# Package files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ===========================
+# Spring Boot
+# ===========================
+# Spring Boot DevTools
+.spring-boot-devtools.properties
+
+# Spring Native
+spring-native-*.pid
+
+# Application properties with secrets (if any)
+application-local.yml
+application-local.properties
+application-secrets.yml
+application-secrets.properties
+
+# ===========================
+# IntelliJ IDEA
+# ===========================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# IntelliJ IDEA task tags
+.idea_modules/
+
+# ===========================
+# Eclipse
+# ===========================
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# ===========================
+# NetBeans
+# ===========================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ===========================
+# VS Code
+# ===========================
+.vscode/
+
+# ===========================
+# OS Generated Files
+# ===========================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===========================
+# Docker
+# ===========================
+# Docker Compose override files (local customizations)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ===========================
+# AWS CDK
+# ===========================
+cdk.out/
+cdk.context.json
+
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+secrets.yml
+secrets.yaml
+
+# ===========================
+# Test & Coverage Reports
+# ===========================
+# JaCoCo
+jacoco.exec
+*.exec
+
+# Surefire reports
+surefire-reports/
+failsafe-reports/
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+
+# ===========================
+# Misc
+# ===========================
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~.nib
+
+# Heap dumps
+*.hprof
+
+# JRebel
+rebel.xml
+
+# Lombok config cache
+.lombok/
+
+# Gradle (if ever used)
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Node modules (if frontend exists)
+node_modules/
+
+# Local development notes
+TODO.local.md
+NOTES.md
+scratch/
