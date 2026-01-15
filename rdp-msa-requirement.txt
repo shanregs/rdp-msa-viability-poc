@@ -1,0 +1,54 @@
+
+Below is the current springboot miscroservice project consisting 4 services namely ingestion service, eligibility service, refdata service, regulatory service.
+There are 4 servers in which these refdata, eligibility running individually in 2 servers and ingestion service,  regulatory service running in all servers.
+I may get 20 requests/sec in ingestion service at max now.
+
+The ingestion service and regulatory service will make rest api call to  eligibiloty and refdata. 
+I need a spring cloud services so that we need eureka servers. Cloud config server is not needed.
+All services should register themselves to eureka services and I want eureka server in server 1 and server 4 for HA. 
+
+ When the ingestion or regulatory service call the refdata and eligbility service in its code flow, it first has to make a call local refdata and eligbility service if they are running in the same server and then if needed it should make to refdata and eligbility service calls to other servers based on the api call Loads to these refdata and eligbility services. Make the API call based on load balancing based on request loads on these refdata and eligbility services from ingestion or regulatory service.
+ 
+So ingestion or regulatory running in all 4 servers need to decide to which server it has to make to call to refdata and eligbility service based on the service request load on these refdata and eligbility services in 2 servers they are running. 
+
+
+Server 1 - refdata service port 8081, ingestion service with profile "equity" port 8082, eligibility service port 8092, Eureka service port 8088
+Server 2 - regulatory service port 8090, ingestion service with profile "forex" port 8083
+Server 3 - refdata service port 8081, ingestion service with profile "irswap" port 8082, eligibility service port 8092
+Server 4 - ingestion service with profile "supporteventhandler" port 8084, Eureka service port 8088
+
+Below is Rest API Calls from one service to another service 
+Ingestion service --> refdata servcice 
+Ingestion service --> eligbility servcice 
+regulatory service --> refdata servcice 
+regulatory service --> eligbility servcice 
+Provide the services and components diagram with C4
+
+Consider each server as one docker running with multiple services under it. Assume all servers are accessible under are in same network.
+
+So the docker compose for every server need to accomodate the services to be run accordingly.
+
+
+I  don't want to check eveytime the local or remote  refdata or eligibility service health for every rest api i make call. First i have to make local api call first and if it fails , then retry on remote call. If that fails, do retry on Resilience based configuration, based on exponential backoff try with the list of services instances (local/remote) i.e refdata or eligibility .
+
+Use proper design on resilince for retry, circuit breaker mechasims when we make rest API calls to refdata or eligbility service. 
+if any call fails on timeout, prefer another service i.e check the load or availability in client LB and choose that server to hit.
+
+ Is there anyway to get the health of refdata/eligbiility separately from registry using executor service thread ( with minimal count which will run in the background for every 10 sec i.e configurable) separately , which will update the Service Instances health object maintained in igestion service/regulatory service and will be used in making refdasa/eligibility call . Make the service instances object as  thread safe as the producer i.e. thread from executor service updates it and ingestion/regulatory client consumes it when calling rest api.
+ Is this a better way to have or can you suggest something better.
+ 
+explain how the client LB works in the document and create proper C4 Context and Container, class  diagrams illustration including how client LB first picks local   refdata or eligibility service 
+
+ 
+
+
+Dont Provide full code now. Bootstrap a microservice springboot project with parent pom and sub modules pom only.
+Once i confirm the designs of the mircoservice, we can go for implementation later in springboot 3.5.6,  java 21, lombok, feign client or advanced rest api client, jdk 21 with springboot 3.5.6 and its matching spring clound library framework for service discovery, client load balancing, configuration properties based Retry and Circuit breaker.. 
+
+I want to confirm the  with a new multimodule  spring project with all these services by checking the provided  microservice architecture diagreams, api flow diagrams with sequence with Client LB,  C4 diagrams on context,Container,  components. along with docker files and docker compose. 
+
+Provide the readme, microservice architecture, C4 documents, docker images architecture, api call flows with Load balancing documents in docs directory.
+create a CLAUDE.md file as the initial project spec with the context given in this file. 
+
+
+Consider that Iam using win 11 and intellij ultimate latest as my dev environment
