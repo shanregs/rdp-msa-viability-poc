@@ -9,9 +9,9 @@ services:
     container_name: rdp-server3
     hostname: server3
     ports:
-      - "18081:8081"  # RefData Service (different host port to avoid conflict with server1)
-      - "18082:8082"  # Ingestion Service (irswap)
-      - "18092:8092"  # Eligibility Service
+      - "18081:8081"  # Reference Lookup Service (different host port to avoid conflict with server1)
+      - "18082:8082"  # Trade Receiver Service (irswap)
+      - "18092:8092"  # Check Eligible Service
     environment:
       - JAVA_OPTS=-Xmx512m -Xms256m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka

@@ -22,10 +22,10 @@
     <modules>
         <module>common</module>
         <module>eureka-server</module>
-        <module>refdata-service</module>
-        <module>eligibility-service</module>
-        <module>ingestion-service</module>
-        <module>regulatory-service</module>
+        <module>reference-lookup-service</module>
+        <module>check-eligible-service</module>
+        <module>trade-receiver-service</module>
+        <module>eq-trade-handler-service</module>
     </modules>
 
     <properties>

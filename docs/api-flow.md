@@ -7,27 +7,27 @@ This document describes the API call flows, sequence diagrams, and client-side l
 ```
 ┌─────────────────┐          ┌─────────────────┐
 │                 │          │                 │
-│   Ingestion     │─────────►│    RefData      │
+│   Ingestion     │─────────►│   RefLookup     │
 │   Service       │          │    Service      │
 │                 │─────┐    │                 │
 └─────────────────┘     │    └─────────────────┘
                         │
                         │    ┌─────────────────┐
                         │    │                 │
-                        └───►│   Eligibility   │
+                        └───►│  CheckEligible  │
                              │    Service      │
                              └─────────────────┘
 
 ┌─────────────────┐          ┌─────────────────┐
 │                 │          │                 │
-│   Regulatory    │─────────►│    RefData      │
+│   Regulatory    │─────────►│   RefLookup     │
 │   Service       │          │    Service      │
 │                 │─────┐    │                 │
 └─────────────────┘     │    └─────────────────┘
                         │
                         │    ┌─────────────────┐
                         │    │                 │
-                        └───►│   Eligibility   │
+                        └───►│  CheckEligible  │
                              │    Service      │
                              └─────────────────┘
 ```
@@ -38,13 +38,13 @@ This document describes the API call flows, sequence diagrams, and client-side l
 
 ```
 ┌────────┐     ┌─────────────┐     ┌───────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Client │     │  Ingestion  │     │ LocalFirstLB  │     │  RefData    │     │ Eligibility │
+│ Client │     │TradeReceiver│     │ LocalFirstLB  │     │ RefLookup   │     │ Eligibility │
 └───┬────┘     └──────┬──────┘     └───────┬───────┘     └──────┬──────┘     └──────┬──────┘
     │                 │                    │                    │                   │
     │  POST /ingest   │                    │                    │                   │
     │────────────────►│                    │                    │                   │
     │                 │                    │                    │                   │
-    │                 │  getRefData()      │                    │                   │
+    │                 │  getRefLookup()      │                    │                   │
     │                 │───────────────────►│                    │                   │
     │                 │                    │                    │                   │
     │                 │                    │  choose(refdata)   │                   │
@@ -56,7 +56,7 @@ This document describes the API call flows, sequence diagrams, and client-side l
     │                 │                    │  available         │                   │
     │                 │                    │───────────────────►│                   │
     │                 │                    │                    │                   │
-    │                 │                    │    RefData         │                   │
+    │                 │                    │    RefLookup         │                   │
     │                 │◄───────────────────│◄───────────────────│                   │
     │                 │                    │                    │                   │
     │                 │  checkEligibility()│                    │                   │
@@ -83,8 +83,8 @@ This document describes the API call flows, sequence diagrams, and client-side l
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Ingestion  │     │ LocalFirstLB │     │ ServiceInstance │     │  Target Service │
-│  Service    │     │              │     │ Registry        │     │  (RefData/Elig) │
+│TradeReceiver│     │ LocalFirstLB │     │ ServiceInstance │     │  Target Service │
+│  Service    │     │              │     │ Registry        │     │  (RefLookup/Elig) │
 └──────┬──────┘     └──────┬───────┘     └────────┬────────┘     └────────┬────────┘
        │                   │                      │                       │
        │  choose(serviceId)│                      │                       │
@@ -120,11 +120,11 @@ This document describes the API call flows, sequence diagrams, and client-side l
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Ingestion  │     │ LocalFirstLB │     │ Local       │     │ Remote      │
-│  Service    │     │ + Resilience │     │ RefData     │     │ RefData     │
+│TradeReceiver│     │ LocalFirstLB │     │ Local       │     │ Remote      │
+│  Service    │     │ + Resilience │     │ RefLookup     │     │ RefLookup     │
 └──────┬──────┘     └──────┬───────┘     └──────┬──────┘     └──────┬──────┘
        │                   │                    │                   │
-       │  getRefData()     │                    │                   │
+       │  getRefLookup()     │                    │                   │
        │──────────────────►│                    │                   │
        │                   │                    │                   │
        │                   │ choose() → local   │                   │
@@ -156,11 +156,11 @@ This document describes the API call flows, sequence diagrams, and client-side l
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌────────────────┐     ┌─────────────┐
-│  Ingestion  │     │ CircuitBreaker│    │ LocalFirstLB   │     │  RefData    │
+│TradeReceiver│     │ CircuitBreaker│    │ LocalFirstLB   │     │ RefLookup   │
 │  Service    │     │              │     │                │     │  Service    │
 └──────┬──────┘     └──────┬───────┘     └───────┬────────┘     └──────┬──────┘
        │                   │                     │                     │
-       │  getRefData()     │                     │                     │
+       │  getRefLookup()     │                     │                     │
        │──────────────────►│                     │                     │
        │                   │                     │                     │
        │                   │  State: CLOSED      │                     │
@@ -177,7 +177,7 @@ This document describes the API call flows, sequence diagrams, and client-side l
        │                   │  │ State: CLOSED → OPEN                │  │
        │                   │  └─────────────────────────────────────┘  │
        │                   │                     │                     │
-       │  getRefData()     │                     │                     │
+       │  getRefLookup()     │                     │                     │
        │──────────────────►│                     │                     │
        │                   │                     │                     │
        │                   │  State: OPEN        │                     │
@@ -196,7 +196,7 @@ This document describes the API call flows, sequence diagrams, and client-side l
        │                   │  │ Allow limited requests              │  │
        │                   │  └─────────────────────────────────────┘  │
        │                   │                     │                     │
-       │  getRefData()     │                     │                     │
+       │  getRefLookup()     │                     │                     │
        │──────────────────►│                     │                     │
        │                   │                     │                     │
        │                   │  State: HALF_OPEN   │                     │
@@ -219,7 +219,7 @@ This document describes the API call flows, sequence diagrams, and client-side l
 
 ```
 ┌────────────────┐     ┌─────────────────┐     ┌─────────────┐     ┌─────────────┐
-│ HealthMonitor  │     │ ServiceInstance │     │  RefData    │     │ Eligibility │
+│ HealthMonitor  │     │ ServiceInstance │     │ RefLookup   │     │ Eligibility │
 │ (ExecutorSvc)  │     │ Registry        │     │  Service    │     │ Service     │
 └───────┬────────┘     └────────┬────────┘     └──────┬──────┘     └──────┬──────┘
         │                       │                     │                   │
@@ -266,7 +266,7 @@ This document describes the API call flows, sequence diagrams, and client-side l
 │                                                                              │
 │                    Local-First Load Balancer Algorithm                       │
 │                                                                              │
-│  Input: serviceId (e.g., "refdata-service", "eligibility-service")           │
+│  Input: serviceId (e.g., "reference-lookup-service", "check-eligible-service")           │
 │  Output: ServiceInstance to route the request to                             │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────────┐ │
@@ -332,7 +332,7 @@ This document describes the API call flows, sequence diagrams, and client-side l
 resilience4j:
   retry:
     instances:
-      refdata-service:
+      reference-lookup-service:
         max-attempts: 3
         wait-duration: 500ms
         exponential-backoff-multiplier: 2
@@ -342,7 +342,7 @@ resilience4j:
         ignore-exceptions:
           - com.bmo.rdp.common.exception.BusinessException
 
-      eligibility-service:
+      check-eligible-service:
         max-attempts: 3
         wait-duration: 500ms
         exponential-backoff-multiplier: 2
@@ -354,7 +354,7 @@ resilience4j:
 resilience4j:
   circuitbreaker:
     instances:
-      refdata-service:
+      reference-lookup-service:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 10
         failure-rate-threshold: 50
@@ -362,7 +362,7 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 3
         automatic-transition-from-open-to-half-open-enabled: true
 
-      eligibility-service:
+      check-eligible-service:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 10
         failure-rate-threshold: 50
@@ -371,7 +371,7 @@ resilience4j:
 
 ## API Endpoints
 
-### Ingestion Service
+### Trade Receiver Service
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -379,7 +379,7 @@ resilience4j:
 | GET | `/api/v1/ingest/{id}` | Get ingestion status |
 | GET | `/actuator/health` | Health check |
 
-### Regulatory Service
+### EQ Trade Handler Service
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -387,7 +387,7 @@ resilience4j:
 | GET | `/api/v1/regulatory/{id}` | Get processing status |
 | GET | `/actuator/health` | Health check |
 
-### RefData Service
+### Reference Lookup Service
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -395,7 +395,7 @@ resilience4j:
 | GET | `/api/v1/refdata/{type}/{id}` | Get specific reference data |
 | GET | `/actuator/health` | Health check |
 
-### Eligibility Service
+### Check Eligible Service
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

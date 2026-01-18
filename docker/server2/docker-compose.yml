@@ -9,8 +9,8 @@ services:
     container_name: rdp-server2
     hostname: server2
     ports:
-      - "8090:8090"   # Regulatory Service
-      - "8083:8083"   # Ingestion Service (forex)
+      - "8090:8090"   # EQ Trade Handler Service
+      - "8083:8083"   # Trade Receiver Service (forex)
     environment:
       - JAVA_OPTS=-Xmx384m -Xms192m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka

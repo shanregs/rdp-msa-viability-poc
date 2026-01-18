@@ -72,19 +72,19 @@ Shows the high-level technical building blocks.
 │  │                              Consumer Services                                      │ │
 │  │                                                                                     │ │
 │  │   ┌──────────────────────────────────┐   ┌──────────────────────────────────┐       │ │
-│  │   │       Ingestion Service          │   │      Regulatory Service          │       │ │
+│  │   │       Trade Receiver Service          │   │      EQ Trade Handler Service          │       │ │
 │  │   │                                  │   │                                  │       │ │
 │  │   │  ┌────────┐ ┌────────┐           │   │                                  │       │ │
 │  │   │  │ equity │ │ forex  │           │   │     Single Instance              │       │ │
 │  │   │  │ :8082  │ │ :8083  │           │   │     Server 2:8090                │       │ │
 │  │   │  └────────┘ └────────┘           │   │                                  │       │ │
-│  │   │  ┌────────┐ ┌────────┐           │   │  - Calls RefData Service         │       │ │
-│  │   │  │irswap  │ │support │           │   │  - Calls Eligibility Service     │       │ │
+│  │   │  ┌────────┐ ┌────────┐           │   │  - Calls Reference Lookup Service         │       │ │
+│  │   │  │irswap  │ │support │           │   │  - Calls Check Eligible Service     │       │ │
 │  │   │  │ :8082  │ │ :8084  │           │   │  - Local-first Load Balancing    │       │ │
 │  │   │  └────────┘ └────────┘           │   │  - Resilience4j Integration      │       │ │
 │  │   │                                  │   │                                  │       │ │
-│  │   │  - Calls RefData Service         │   └──────────────────────────────────┘       │ │
-│  │   │  - Calls Eligibility Service     │                                              │ │
+│  │   │  - Calls Reference Lookup Service         │   └──────────────────────────────────┘       │ │
+│  │   │  - Calls Check Eligible Service     │                                              │ │
 │  │   │  - Local-first Load Balancing    │                                              │ │
 │  │   │  - Resilience4j Integration      │                                              │ │
 │  │   └──────────────────────────────────┘                                              │ │
@@ -97,7 +97,7 @@ Shows the high-level technical building blocks.
 │  │                              Provider Services                                      │ │
 │  │                                                                                     │ │
 │  │   ┌──────────────────────────────────┐   ┌──────────────────────────────────┐       │ │
-│  │   │        RefData Service           │   │      Eligibility Service         │       │ │
+│  │   │        Reference Lookup Service           │   │      Check Eligible Service         │       │ │
 │  │   │                                  │   │                                  │       │ │
 │  │   │   Instance 1: Server 1:8081      │   │   Instance 1: Server 1:8092      │       │ │
 │  │   │   Instance 2: Server 3:8081      │   │   Instance 2: Server 3:8092      │       │ │
@@ -118,21 +118,21 @@ Legend:
 └─────────────┘
 ```
 
-## Level 3: Component Diagram - Ingestion Service
+## Level 3: Component Diagram - Trade Receiver Service
 
-Shows internal components of the Ingestion Service.
+Shows internal components of the Trade Receiver Service.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                             │
-│                               Ingestion Service                                             │
+│                               Trade Receiver Service                                             │
 │                                                                                             │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────┐ │
 │  │                                 API Layer                                              │ │
 │  │                                                                                        │ │
 │  │   ┌─────────────────────┐                                                              │ │
 │  │   │                     │                                                              │ │
-│  │   │  IngestionController│  REST endpoints for data ingestion                           │ │
+│  │   │  TradeReceiverController│  REST endpoints for data ingestion                           │ │
 │  │   │                     │  Handles incoming requests                                   │ │
 │  │   └──────────┬──────────┘                                                              │ │
 │  │              │                                                                         │ │
@@ -143,7 +143,7 @@ Shows internal components of the Ingestion Service.
 │  │                                                                                        │ │
 │  │   ┌─────────────────────┐                                                              │ │
 │  │   │                     │                                                              │ │
-│  │   │  IngestionService   │  Business logic for data processing                          │ │
+│  │   │  TradeReceiverService   │  Business logic for data processing                          │ │
 │  │   │                     │  Orchestrates calls to downstream services                   │ │
 │  │   └──────────┬──────────┘                                                              │ │
 │  │              │                                                                         │ │
@@ -154,7 +154,7 @@ Shows internal components of the Ingestion Service.
 │  │                                                                                        │ │
 │  │   ┌─────────────────────┐         ┌─────────────────────┐                              │ │
 │  │   │                     │         │                     │                              │ │
-│  │   │  RefDataClient      │         │ EligibilityClient   │  Feign Clients with          │ │
+│  │   │  ReferenceLookupClient      │         │ CheckEligibleClient   │  Feign Clients with          │ │
 │  │   │  (Feign + LB)       │         │ (Feign + LB)        │  LoadBalancer integration    │ │
 │  │   │                     │         │                     │                              │ │
 │  │   └──────────┬──────────┘         └──────────┬──────────┘                              │ │

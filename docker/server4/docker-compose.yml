@@ -10,7 +10,7 @@ services:
     hostname: server4
     ports:
       - "18088:8088"  # Eureka Server (different host port to avoid conflict with server1)
-      - "8084:8084"   # Ingestion Service (supporteventhandler)
+      - "8084:8084"   # Trade Receiver Service (supporteventhandler)
     environment:
       - JAVA_OPTS=-Xmx384m -Xms192m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka

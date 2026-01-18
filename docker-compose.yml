@@ -4,7 +4,7 @@ version: '3.8'
 # This file orchestrates all 4 servers in a single deployment
 
 services:
-  # Server 1: Eureka (primary), Ingestion (equity), RefData, Eligibility
+  # Server 1: Eureka (primary), Trade Receiver (equity), Reference Lookup, Check Eligible
   server1:
     build:
       context: .
@@ -14,9 +14,9 @@ services:
     hostname: server1
     ports:
       - "8088:8088"   # Eureka Server
-      - "8082:8082"   # Ingestion Service (equity)
-      - "8081:8081"   # RefData Service
-      - "8092:8092"   # Eligibility Service
+      - "8082:8082"   # Trade Receiver Service (equity)
+      - "8081:8081"   # Reference Lookup Service
+      - "8092:8092"   # Check Eligible Service
     environment:
       - JAVA_OPTS=-Xmx512m -Xms256m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
@@ -33,7 +33,7 @@ services:
       start_period: 90s
     restart: unless-stopped
 
-  # Server 2: Regulatory, Ingestion (forex)
+  # Server 2: EQ Trade Handler, Trade Receiver (forex)
   server2:
     build:
       context: .
@@ -42,8 +42,8 @@ services:
     container_name: rdp-server2
     hostname: server2
     ports:
-      - "8090:8090"   # Regulatory Service
-      - "8083:8083"   # Ingestion Service (forex)
+      - "8090:8090"   # EQ Trade Handler Service
+      - "8083:8083"   # Trade Receiver Service (forex)
     environment:
       - JAVA_OPTS=-Xmx384m -Xms192m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
@@ -63,7 +63,7 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # Server 3: RefData, Ingestion (irswap), Eligibility
+  # Server 3: Reference Lookup, Trade Receiver (irswap), Check Eligible
   server3:
     build:
       context: .
@@ -72,9 +72,9 @@ services:
     container_name: rdp-server3
     hostname: server3
     ports:
-      - "18081:8081"  # RefData Service
-      - "18082:8082"  # Ingestion Service (irswap)
-      - "18092:8092"  # Eligibility Service
+      - "18081:8081"  # Reference Lookup Service
+      - "18082:8082"  # Trade Receiver Service (irswap)
+      - "18092:8092"  # Check Eligible Service
     environment:
       - JAVA_OPTS=-Xmx512m -Xms256m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka
@@ -94,7 +94,7 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # Server 4: Eureka (secondary), Ingestion (supporteventhandler)
+  # Server 4: Eureka (secondary), Trade Receiver (supporteventhandler)
   server4:
     build:
       context: .
@@ -104,7 +104,7 @@ services:
     hostname: server4
     ports:
       - "18088:8088"  # Eureka Server
-      - "8084:8084"   # Ingestion Service (supporteventhandler)
+      - "8084:8084"   # Trade Receiver Service (supporteventhandler)
     environment:
       - JAVA_OPTS=-Xmx384m -Xms192m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka

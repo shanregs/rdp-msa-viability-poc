@@ -13,14 +13,14 @@ The system consists of 5 core services distributed across 4 servers (Docker cont
 │                              RDP MSA System                                  │
 │                                                                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │   Eureka    │  │  Ingestion  │  │  RefData    │  │    Eligibility      │ │
+│  │   Eureka    │  │Trade Receiver│  │  RefLookup  │  │   Check Eligible    │ │
 │  │   Server    │  │   Service   │  │  Service    │  │      Service        │ │
 │  │    (HA)     │  │ (4 profiles)│  │ (2 inst.)   │  │    (2 inst.)        │ │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘ │
 │                                                                              │
 │                          ┌─────────────┐                                     │
-│                          │ Regulatory  │                                     │
-│                          │  Service    │                                     │
+│                          │ EQ Trade    │                                     │
+│                          │  Handler    │                                     │
 │                          └─────────────┘                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -41,9 +41,9 @@ The system consists of 5 core services distributed across 4 servers (Docker cont
 - Health monitoring of registered services
 - Peer replication for HA
 
-### 2. Ingestion Service
+### 2. Trade Receiver Service
 
-**Purpose**: Entry point for data ingestion into the system.
+**Purpose**: Entry point for trade data into the system.
 
 **Deployment**: 4 instances with different profiles
 - Server 1: Port 8082 (profile: equity)
@@ -53,34 +53,34 @@ The system consists of 5 core services distributed across 4 servers (Docker cont
 
 **Responsibilities**:
 - Accept incoming data (up to 20 req/sec)
-- Call RefData service for reference data
-- Call Eligibility service for eligibility checks
+- Call Reference Lookup service for reference data
+- Call Check Eligible service for eligibility checks
 - Implement local-first load balancing
 - Handle resilience (retry, circuit breaker)
 
 **Dependencies**:
-- RefData Service
-- Eligibility Service
+- Reference Lookup Service
+- Check Eligible Service
 
-### 3. Regulatory Service
+### 3. EQ Trade Handler Service
 
-**Purpose**: Handles regulatory processing and compliance.
+**Purpose**: Handles EQ trade processing and compliance.
 
 **Deployment**: Single instance
 - Server 2: Port 8090
 
 **Responsibilities**:
-- Process regulatory requirements
-- Call RefData service for reference data
-- Call Eligibility service for eligibility checks
+- Process EQ trade requirements
+- Call Reference Lookup service for reference data
+- Call Check Eligible service for eligibility checks
 - Implement local-first load balancing
 - Handle resilience (retry, circuit breaker)
 
 **Dependencies**:
-- RefData Service
-- Eligibility Service
+- Reference Lookup Service
+- Check Eligible Service
 
-### 4. RefData Service
+### 4. Reference Lookup Service
 
 **Purpose**: Provides reference data to other services.
 
@@ -93,7 +93,7 @@ The system consists of 5 core services distributed across 4 servers (Docker cont
 - Register with Eureka
 - Expose health endpoints
 
-### 5. Eligibility Service
+### 5. Check Eligible Service
 
 **Purpose**: Performs eligibility checking for transactions.
 
@@ -108,8 +108,8 @@ The system consists of 5 core services distributed across 4 servers (Docker cont
 
 ## Server Distribution Matrix
 
-| Server | Eureka | Ingestion | Regulatory | RefData | Eligibility |
-|--------|--------|-----------|------------|---------|-------------|
+| Server | Eureka | Trade Receiver | EQ Trade Handler | Ref Lookup | Check Eligible |
+|--------|--------|----------------|------------------|------------|----------------|
 | Server 1 | :8088 | :8082 (equity) | - | :8081 | :8092 |
 | Server 2 | - | :8083 (forex) | :8090 | - | - |
 | Server 3 | - | :8082 (irswap) | - | :8081 | :8092 |
@@ -122,28 +122,28 @@ The system consists of 5 core services distributed across 4 servers (Docker cont
 ```
 ┌──────────────────┐         ┌─────────────────┐
 │                  │         │                 │
-│    Ingestion     │────────►│    RefData      │
+│ Trade Receiver   │────────►│  Ref Lookup     │
 │    Service       │         │    Service      │
 │                  │────┐    │                 │
 └──────────────────┘    │    └─────────────────┘
                         │
                         │    ┌─────────────────┐
                         │    │                 │
-                        └───►│   Eligibility   │
+                        └───►│ Check Eligible  │
                              │    Service      │
                              │                 │
                              └─────────────────┘
 
 ┌──────────────────┐         ┌─────────────────┐
 │                  │         │                 │
-│   Regulatory     │────────►│    RefData      │
+│ EQ Trade Handler │────────►│  Ref Lookup     │
 │    Service       │         │    Service      │
 │                  │────┐    │                 │
 └──────────────────┘    │    └─────────────────┘
                         │
                         │    ┌─────────────────┐
                         │    │                 │
-                        └───►│   Eligibility   │
+                        └───►│ Check Eligible  │
                              │    Service      │
                              │                 │
                              └─────────────────┘
@@ -181,11 +181,11 @@ The Eureka Server maintains a registry of all service instances with their metad
 │  └───────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  SERVICE: REFDATA-SERVICE                                                                 │  │
+│  │  SERVICE: REFERENCE-LOOKUP-SERVICE                                                                 │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────────────── │  │
 │  │                                                                                           │  │
 │  │  ┌─────────────────────────────────────────┐  ┌─────────────────────────────────────────┐│  │
-│  │  │  Instance: refdata-service-server1      │  │  Instance: refdata-service-server3      ││  │
+│  │  │  Instance: reference-lookup-service-server1      │  │  Instance: reference-lookup-service-server3      ││  │
 │  │  │  ─────────────────────────────────────  │  │  ─────────────────────────────────────  ││  │
 │  │  │  instanceId: server1:refdata:8081       │  │  instanceId: server3:refdata:8081       ││  │
 │  │  │  hostName:   server1                    │  │  hostName:   server3                    ││  │
@@ -204,11 +204,11 @@ The Eureka Server maintains a registry of all service instances with their metad
 │  └───────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  SERVICE: ELIGIBILITY-SERVICE                                                             │  │
+│  │  SERVICE: CHECK-ELIGIBLE-SERVICE                                                             │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────────────── │  │
 │  │                                                                                           │  │
 │  │  ┌─────────────────────────────────────────┐  ┌─────────────────────────────────────────┐│  │
-│  │  │  Instance: eligibility-service-server1  │  │  Instance: eligibility-service-server3  ││  │
+│  │  │  Instance: check-eligible-service-server1  │  │  Instance: check-eligible-service-server3  ││  │
 │  │  │  ─────────────────────────────────────  │  │  ─────────────────────────────────────  ││  │
 │  │  │  instanceId: server1:eligibility:8092   │  │  instanceId: server3:eligibility:8092   ││  │
 │  │  │  hostName:   server1                    │  │  hostName:   server3                    ││  │
@@ -227,7 +227,7 @@ The Eureka Server maintains a registry of all service instances with their metad
 │  └───────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  SERVICE: INGESTION-SERVICE                                                               │  │
+│  │  SERVICE: TRADE-RECEIVER-SERVICE                                                               │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────────────── │  │
 │  │                                                                                           │  │
 │  │  ┌──────────────────────────────────┐  ┌──────────────────────────────────┐              │  │
@@ -259,11 +259,11 @@ The Eureka Server maintains a registry of all service instances with their metad
 │  └───────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  SERVICE: REGULATORY-SERVICE                                                              │  │
+│  │  SERVICE: EQ-TRADE-HANDLER-SERVICE                                                              │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────────────── │  │
 │  │                                                                                           │  │
 │  │  ┌─────────────────────────────────────────┐                                             │  │
-│  │  │  Instance: regulatory-service-server2   │                                             │  │
+│  │  │  Instance: eq-trade-handler-service-server2   │                                             │  │
 │  │  │  ─────────────────────────────────────  │                                             │  │
 │  │  │  instanceId: server2:regulatory:8090    │                                             │  │
 │  │  │  hostName:   server2                    │                                             │  │
@@ -296,7 +296,7 @@ Each registered service instance contains the following information:
 │  Core Identification                                                         │
 │  ───────────────────                                                         │
 │  ├── instanceId        : Unique identifier (e.g., "server1:refdata:8081")   │
-│  ├── appName           : Application name (e.g., "REFDATA-SERVICE")         │
+│  ├── appName           : Application name (e.g., "REFERENCE-LOOKUP-SERVICE")         │
 │  ├── appGroupName      : Application group (optional)                       │
 │  └── vipAddress        : Virtual IP address for load balancing              │
 │                                                                              │

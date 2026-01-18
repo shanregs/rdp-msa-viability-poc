@@ -34,31 +34,31 @@ Each server is represented as a single Docker container running multiple service
 | Service | Port | Profile |
 |---------|------|---------|
 | Eureka Server | 8088 | - |
-| Ingestion Service | 8082 | equity |
-| RefData Service | 8081 | - |
-| Eligibility Service | 8092 | - |
+| Trade Receiver Service | 8082 | equity |
+| Reference Lookup Service | 8081 | - |
+| Check Eligible Service | 8092 | - |
 
 ### Server 2
 
 | Service | Port | Profile |
 |---------|------|---------|
-| Regulatory Service | 8090 | - |
-| Ingestion Service | 8083 | forex |
+| EQ Trade Handler Service | 8090 | - |
+| Trade Receiver Service | 8083 | forex |
 
 ### Server 3
 
 | Service | Port | Profile |
 |---------|------|---------|
-| RefData Service | 8081 | - |
-| Ingestion Service | 8082 | irswap |
-| Eligibility Service | 8092 | - |
+| Reference Lookup Service | 8081 | - |
+| Trade Receiver Service | 8082 | irswap |
+| Check Eligible Service | 8092 | - |
 
 ### Server 4
 
 | Service | Port | Profile |
 |---------|------|---------|
 | Eureka Server | 8088 | - |
-| Ingestion Service | 8084 | supporteventhandler |
+| Trade Receiver Service | 8084 | supporteventhandler |
 
 ## Dockerfile Templates
 
@@ -102,9 +102,9 @@ WORKDIR /app
 
 # Copy service JARs
 COPY eureka-server/target/eureka-server-*.jar /app/eureka-server.jar
-COPY ingestion-service/target/ingestion-service-*.jar /app/ingestion-service.jar
-COPY refdata-service/target/refdata-service-*.jar /app/refdata-service.jar
-COPY eligibility-service/target/eligibility-service-*.jar /app/eligibility-service.jar
+COPY trade-receiver-service/target/trade-receiver-service-*.jar /app/trade-receiver-service.jar
+COPY reference-lookup-service/target/reference-lookup-service-*.jar /app/reference-lookup-service.jar
+COPY check-eligible-service/target/check-eligible-service-*.jar /app/check-eligible-service.jar
 
 # Copy supervisor config
 COPY docker/server1/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -129,8 +129,8 @@ RUN apk add --no-cache supervisor bash curl
 WORKDIR /app
 
 # Copy service JARs
-COPY regulatory-service/target/regulatory-service-*.jar /app/regulatory-service.jar
-COPY ingestion-service/target/ingestion-service-*.jar /app/ingestion-service.jar
+COPY eq-trade-handler-service/target/eq-trade-handler-service-*.jar /app/eq-trade-handler-service.jar
+COPY trade-receiver-service/target/trade-receiver-service-*.jar /app/trade-receiver-service.jar
 
 # Copy supervisor config
 COPY docker/server2/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -155,9 +155,9 @@ RUN apk add --no-cache supervisor bash curl
 WORKDIR /app
 
 # Copy service JARs
-COPY refdata-service/target/refdata-service-*.jar /app/refdata-service.jar
-COPY ingestion-service/target/ingestion-service-*.jar /app/ingestion-service.jar
-COPY eligibility-service/target/eligibility-service-*.jar /app/eligibility-service.jar
+COPY reference-lookup-service/target/reference-lookup-service-*.jar /app/reference-lookup-service.jar
+COPY trade-receiver-service/target/trade-receiver-service-*.jar /app/trade-receiver-service.jar
+COPY check-eligible-service/target/check-eligible-service-*.jar /app/check-eligible-service.jar
 
 # Copy supervisor config
 COPY docker/server3/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -183,7 +183,7 @@ WORKDIR /app
 
 # Copy service JARs
 COPY eureka-server/target/eureka-server-*.jar /app/eureka-server.jar
-COPY ingestion-service/target/ingestion-service-*.jar /app/ingestion-service.jar
+COPY trade-receiver-service/target/trade-receiver-service-*.jar /app/trade-receiver-service.jar
 
 # Copy supervisor config
 COPY docker/server4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -216,32 +216,32 @@ priority=1
 stdout_logfile=/var/log/eureka-server.log
 stderr_logfile=/var/log/eureka-server-error.log
 
-[program:refdata-service]
-command=java -jar /app/refdata-service.jar --server.port=8081
+[program:reference-lookup-service]
+command=java -jar /app/reference-lookup-service.jar --server.port=8081
 autostart=true
 autorestart=true
 priority=2
 startsecs=30
-stdout_logfile=/var/log/refdata-service.log
-stderr_logfile=/var/log/refdata-service-error.log
+stdout_logfile=/var/log/reference-lookup-service.log
+stderr_logfile=/var/log/reference-lookup-service-error.log
 
-[program:eligibility-service]
-command=java -jar /app/eligibility-service.jar --server.port=8092
+[program:check-eligible-service]
+command=java -jar /app/check-eligible-service.jar --server.port=8092
 autostart=true
 autorestart=true
 priority=2
 startsecs=30
-stdout_logfile=/var/log/eligibility-service.log
-stderr_logfile=/var/log/eligibility-service-error.log
+stdout_logfile=/var/log/check-eligible-service.log
+stderr_logfile=/var/log/check-eligible-service-error.log
 
-[program:ingestion-service]
-command=java -jar /app/ingestion-service.jar --server.port=8082 --spring.profiles.active=equity
+[program:trade-receiver-service]
+command=java -jar /app/trade-receiver-service.jar --server.port=8082 --spring.profiles.active=equity
 autostart=true
 autorestart=true
 priority=3
 startsecs=45
-stdout_logfile=/var/log/ingestion-service.log
-stderr_logfile=/var/log/ingestion-service-error.log
+stdout_logfile=/var/log/trade-receiver-service.log
+stderr_logfile=/var/log/trade-receiver-service-error.log
 ```
 
 ### Server 2 supervisord.conf
@@ -252,22 +252,22 @@ nodaemon=true
 logfile=/var/log/supervisord.log
 pidfile=/var/run/supervisord.pid
 
-[program:regulatory-service]
-command=java -jar /app/regulatory-service.jar --server.port=8090
+[program:eq-trade-handler-service]
+command=java -jar /app/eq-trade-handler-service.jar --server.port=8090
 autostart=true
 autorestart=true
 priority=1
-stdout_logfile=/var/log/regulatory-service.log
-stderr_logfile=/var/log/regulatory-service-error.log
+stdout_logfile=/var/log/eq-trade-handler-service.log
+stderr_logfile=/var/log/eq-trade-handler-service-error.log
 
-[program:ingestion-service]
-command=java -jar /app/ingestion-service.jar --server.port=8083 --spring.profiles.active=forex
+[program:trade-receiver-service]
+command=java -jar /app/trade-receiver-service.jar --server.port=8083 --spring.profiles.active=forex
 autostart=true
 autorestart=true
 priority=2
 startsecs=30
-stdout_logfile=/var/log/ingestion-service.log
-stderr_logfile=/var/log/ingestion-service-error.log
+stdout_logfile=/var/log/trade-receiver-service.log
+stderr_logfile=/var/log/trade-receiver-service-error.log
 ```
 
 ### Server 3 supervisord.conf
@@ -278,30 +278,30 @@ nodaemon=true
 logfile=/var/log/supervisord.log
 pidfile=/var/run/supervisord.pid
 
-[program:refdata-service]
-command=java -jar /app/refdata-service.jar --server.port=8081
+[program:reference-lookup-service]
+command=java -jar /app/reference-lookup-service.jar --server.port=8081
 autostart=true
 autorestart=true
 priority=1
-stdout_logfile=/var/log/refdata-service.log
-stderr_logfile=/var/log/refdata-service-error.log
+stdout_logfile=/var/log/reference-lookup-service.log
+stderr_logfile=/var/log/reference-lookup-service-error.log
 
-[program:eligibility-service]
-command=java -jar /app/eligibility-service.jar --server.port=8092
+[program:check-eligible-service]
+command=java -jar /app/check-eligible-service.jar --server.port=8092
 autostart=true
 autorestart=true
 priority=1
-stdout_logfile=/var/log/eligibility-service.log
-stderr_logfile=/var/log/eligibility-service-error.log
+stdout_logfile=/var/log/check-eligible-service.log
+stderr_logfile=/var/log/check-eligible-service-error.log
 
-[program:ingestion-service]
-command=java -jar /app/ingestion-service.jar --server.port=8082 --spring.profiles.active=irswap
+[program:trade-receiver-service]
+command=java -jar /app/trade-receiver-service.jar --server.port=8082 --spring.profiles.active=irswap
 autostart=true
 autorestart=true
 priority=2
 startsecs=30
-stdout_logfile=/var/log/ingestion-service.log
-stderr_logfile=/var/log/ingestion-service-error.log
+stdout_logfile=/var/log/trade-receiver-service.log
+stderr_logfile=/var/log/trade-receiver-service-error.log
 ```
 
 ### Server 4 supervisord.conf
@@ -320,14 +320,14 @@ priority=1
 stdout_logfile=/var/log/eureka-server.log
 stderr_logfile=/var/log/eureka-server-error.log
 
-[program:ingestion-service]
-command=java -jar /app/ingestion-service.jar --server.port=8084 --spring.profiles.active=supporteventhandler
+[program:trade-receiver-service]
+command=java -jar /app/trade-receiver-service.jar --server.port=8084 --spring.profiles.active=supporteventhandler
 autostart=true
 autorestart=true
 priority=2
 startsecs=30
-stdout_logfile=/var/log/ingestion-service.log
-stderr_logfile=/var/log/ingestion-service-error.log
+stdout_logfile=/var/log/trade-receiver-service.log
+stderr_logfile=/var/log/trade-receiver-service-error.log
 ```
 
 ## Docker Compose Files

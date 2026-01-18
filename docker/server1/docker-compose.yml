@@ -10,9 +10,9 @@ services:
     hostname: server1
     ports:
       - "8088:8088"   # Eureka Server
-      - "8082:8082"   # Ingestion Service (equity)
-      - "8081:8081"   # RefData Service
-      - "8092:8092"   # Eligibility Service
+      - "8082:8082"   # Trade Receiver Service (equity)
+      - "8081:8081"   # Reference Lookup Service
+      - "8092:8092"   # Check Eligible Service
     environment:
       - JAVA_OPTS=-Xmx512m -Xms256m
       - EUREKA_SERVER_URL=http://server1:8088/eureka,http://server4:8088/eureka

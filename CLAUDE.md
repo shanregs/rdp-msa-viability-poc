@@ -10,42 +10,42 @@ This is a Spring Boot microservices proof-of-concept demonstrating service disco
 
 | Service | Description | Profiles |
 |---------|-------------|----------|
-| **ingestion-service** | Entry point for data ingestion, handles ~20 req/sec max | equity, forex, irswap, supporteventhandler |
-| **regulatory-service** | Regulatory processing service | - |
-| **refdata-service** | Reference data provider | - |
-| **eligibility-service** | Eligibility checking service | - |
+| **trade-receiver-service** | Entry point for data trade-receiver, handles ~20 req/sec max | equity, forex, irswap, supporteventhandler |
+| **eq-trade-handler-service** | Regulatory processing service | - |
+| **reference-lookup-service** | Reference data provider | - |
+| **check-eligible-service** | Eligibility checking service | - |
 | **eureka-server** | Service discovery (Netflix Eureka) | - |
 
 ### Server Distribution
 
 ```
 Server 1 (Docker)
-├── refdata-service         :8081
-├── ingestion-service       :8082  (profile: equity)
-├── eligibility-service     :8092
+├── reference-lookup-service         :8081
+├── trade-receiver-service       :8082  (profile: equity)
+├── check-eligible-service     :8092
 └── eureka-server           :8088
 
 Server 2 (Docker)
-├── regulatory-service      :8090
-└── ingestion-service       :8083  (profile: forex)
+├── eq-trade-handler-service      :8090
+└── trade-receiver-service       :8083  (profile: forex)
 
 Server 3 (Docker)
-├── refdata-service         :8081
-├── ingestion-service       :8082  (profile: irswap)
-└── eligibility-service     :8092
+├── reference-lookup-service         :8081
+├── trade-receiver-service       :8082  (profile: irswap)
+└── check-eligible-service     :8092
 
 Server 4 (Docker)
-├── ingestion-service       :8084  (profile: supporteventhandler)
+├── trade-receiver-service       :8084  (profile: supporteventhandler)
 └── eureka-server           :8088
 ```
 
 ### Service Communication
 
 ```
-ingestion-service  ──────► refdata-service
-ingestion-service  ──────► eligibility-service
-regulatory-service ──────► refdata-service
-regulatory-service ──────► eligibility-service
+trade-receiver-service  ──────► reference-lookup-service
+trade-receiver-service  ──────► check-eligible-service
+eq-trade-handler-service ──────► reference-lookup-service
+eq-trade-handler-service ──────► check-eligible-service
 ```
 
 ## Key Requirements
@@ -56,7 +56,7 @@ regulatory-service ──────► eligibility-service
 - No Cloud Config server needed
 
 ### 2. Client-Side Load Balancing (Local-First Strategy)
-- When ingestion/regulatory calls refdata/eligibility:
+- When trade-receiver/eq-trade-handler calls refdata/eligibility:
   1. First attempt: Call LOCAL instance (same server) if available
   2. Second attempt: If local fails, call REMOTE instance based on load
   3. Load-aware routing: Choose instance with lowest request load
@@ -96,13 +96,13 @@ rdp-msa-viability-poc/
 ├── pom.xml                          # Parent POM
 ├── eureka-server/
 │   └── pom.xml
-├── refdata-service/
+├── reference-lookup-service/
 │   └── pom.xml
-├── eligibility-service/
+├── check-eligible-service/
 │   └── pom.xml
-├── ingestion-service/
+├── trade-receiver-service/
 │   └── pom.xml
-├── regulatory-service/
+├── eq-trade-handler-service/
 │   └── pom.xml
 ├── common/                          # Shared utilities
 │   └── pom.xml

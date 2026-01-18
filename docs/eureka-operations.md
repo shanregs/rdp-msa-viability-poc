@@ -26,7 +26,7 @@ When a service instance starts, it registers itself with the Eureka Server.
 
 ```
 ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-│  RefData        │          │  Eureka Server  │          │  Eureka Server  │
+│  Reference Lookup        │          │  Eureka Server  │          │  Eureka Server  │
 │  Service        │          │  (Server 1)     │          │  (Server 4)     │
 │  (Server 1)     │          │  :8088          │          │  :8088          │
 └────────┬────────┘          └────────┬────────┘          └────────┬────────┘
@@ -34,13 +34,13 @@ When a service instance starts, it registers itself with the Eureka Server.
          │  1. Application Starts     │                            │
          │  ─────────────────────     │                            │
          │                            │                            │
-         │  2. POST /eureka/apps/REFDATA-SERVICE                   │
+         │  2. POST /eureka/apps/REFERENCE-LOOKUP-SERVICE                   │
          │  ──────────────────────────────────────────────────────►│
          │     Body: InstanceInfo JSON                             │
          │     {                                                   │
          │       "instanceId": "server1:refdata:8081",             │
          │       "hostName": "server1",                            │
-         │       "app": "REFDATA-SERVICE",                         │
+         │       "app": "REFERENCE-LOOKUP-SERVICE",                         │
          │       "ipAddr": "172.18.0.2",                           │
          │       "port": { "$": 8081, "@enabled": true },          │
          │       "status": "UP",                                   │
@@ -54,7 +54,7 @@ When a service instance starts, it registers itself with the Eureka Server.
          │                            │  4. Store in Registry      │
          │                            │  ─────────────────────     │
          │                            │  registry.put(             │
-         │                            │    "REFDATA-SERVICE",      │
+         │                            │    "REFERENCE-LOOKUP-SERVICE",      │
          │                            │    instanceId,             │
          │                            │    Lease<InstanceInfo>     │
          │                            │  )                         │
@@ -144,7 +144,7 @@ When a service instance starts, it registers itself with the Eureka Server.
 │  │  ConcurrentHashMap<String, Map<String, Lease<InstanceInfo>>> registry                │  │
 │  │                                                                                       │  │
 │  │  {                                                                                    │  │
-│  │    "REFDATA-SERVICE": {                                                              │  │
+│  │    "REFERENCE-LOOKUP-SERVICE": {                                                              │  │
 │  │      "server1:refdata:8081": Lease {                                                 │  │
 │  │        holder: InstanceInfo { ... },                                                 │  │
 │  │        registrationTimestamp: 1704067200000,                                         │  │
@@ -170,14 +170,14 @@ Services send heartbeats every 30 seconds to maintain their lease.
 
 ```
 ┌─────────────────┐          ┌─────────────────┐
-│  RefData        │          │  Eureka Server  │
+│  Reference Lookup        │          │  Eureka Server  │
 │  Service        │          │  (Server 1)     │
 └────────┬────────┘          └────────┬────────┘
          │                            │
          │  Every 30 seconds          │
          │  ────────────────          │
          │                            │
-         │  PUT /eureka/apps/REFDATA-SERVICE/server1:refdata:8081
+         │  PUT /eureka/apps/REFERENCE-LOOKUP-SERVICE/server1:refdata:8081
          │───────────────────────────►│
          │  Query params:             │
          │    status=UP               │
@@ -186,7 +186,7 @@ Services send heartbeats every 30 seconds to maintain their lease.
          │                            │  1. Find lease in registry
          │                            │  ─────────────────────────
          │                            │  lease = registry
-         │                            │    .get("REFDATA-SERVICE")
+         │                            │    .get("REFERENCE-LOOKUP-SERVICE")
          │                            │    .get("server1:refdata:8081")
          │                            │
          │                            │  2. Renew the lease
@@ -206,7 +206,7 @@ Services send heartbeats every 30 seconds to maintain their lease.
          │                            │
          │  ─── 30 seconds later ───  │
          │                            │
-         │  PUT /eureka/apps/REFDATA-SERVICE/server1:refdata:8081
+         │  PUT /eureka/apps/REFERENCE-LOOKUP-SERVICE/server1:refdata:8081
          │───────────────────────────►│
          │                            │
          │  200 OK                    │
@@ -367,11 +367,11 @@ Client services fetch the registry to discover available service instances.
          │    "applications": {       │
          │      "application": [      │
          │        {                   │
-         │          "name": "REFDATA-SERVICE",
+         │          "name": "REFERENCE-LOOKUP-SERVICE",
          │          "instance": [...]│
          │        },                  │
          │        {                   │
-         │          "name": "ELIGIBILITY-SERVICE",
+         │          "name": "CHECK-ELIGIBLE-SERVICE",
          │          "instance": [...]│
          │        }                   │
          │      ]                     │
@@ -529,7 +529,7 @@ When a service instance shuts down gracefully, it deregisters from Eureka.
 
 ```
 ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-│  RefData        │          │  Eureka Server  │          │  Eureka Server  │
+│  Reference Lookup        │          │  Eureka Server  │          │  Eureka Server  │
 │  Service        │          │  (Server 1)     │          │  (Server 4)     │
 └────────┬────────┘          └────────┬────────┘          └────────┬────────┘
          │                            │                            │
@@ -541,13 +541,13 @@ When a service instance shuts down gracefully, it deregisters from Eureka.
          │  ─────────────────────     │                            │
          │  eurekaClient.shutdown()   │                            │
          │                            │                            │
-         │  3. DELETE /eureka/apps/REFDATA-SERVICE/server1:refdata:8081
+         │  3. DELETE /eureka/apps/REFERENCE-LOOKUP-SERVICE/server1:refdata:8081
          │───────────────────────────►│                            │
          │                            │                            │
          │                            │  4. Remove from registry   │
          │                            │  ────────────────────────  │
          │                            │  registry                  │
-         │                            │    .get("REFDATA-SERVICE") │
+         │                            │    .get("REFERENCE-LOOKUP-SERVICE") │
          │                            │    .remove(instanceId)     │
          │                            │                            │
          │                            │  5. Invalidate cache       │
@@ -652,7 +652,7 @@ How services discover and cache available instances locally.
 │                        CLIENT-SIDE SERVICE DISCOVERY                                        │
 │                                                                                             │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  Ingestion Service - Discovery Client Setup                                           │  │
+│  │  Trade Receiver Service - Discovery Client Setup                                           │  │
 │  │  ──────────────────────────────────────────                                           │  │
 │  │                                                                                       │  │
 │  │  @SpringBootApplication                                                               │  │
@@ -672,19 +672,19 @@ How services discover and cache available instances locally.
 │  │  ────────────────────────────────                                                     │  │
 │  │                                                                                       │  │
 │  │  ┌─────────────────────────────────────────────────────────────────────────────────┐  │  │
-│  │  │                     Ingestion Service (Server 1)                                │  │  │
+│  │  │                     Trade Receiver Service (Server 1)                                │  │  │
 │  │  │                                                                                 │  │  │
 │  │  │   ┌─────────────────────────────────────────────────────────────────────────┐   │  │  │
 │  │  │   │  Local Cache: AtomicReference<Applications>                             │   │  │  │
 │  │  │   │                                                                         │   │  │  │
 │  │  │   │  ┌─────────────────────────────────────────────────────────────────┐    │   │  │  │
-│  │  │   │  │  REFDATA-SERVICE                                                │    │   │  │  │
+│  │  │   │  │  REFERENCE-LOOKUP-SERVICE                                                │    │   │  │  │
 │  │  │   │  │  ├── server1:refdata:8081 (172.18.0.2:8081) [LOCAL] ✓           │    │   │  │  │
 │  │  │   │  │  └── server3:refdata:8081 (172.18.0.4:8081) [REMOTE]            │    │   │  │  │
 │  │  │   │  └─────────────────────────────────────────────────────────────────┘    │   │  │  │
 │  │  │   │                                                                         │   │  │  │
 │  │  │   │  ┌─────────────────────────────────────────────────────────────────┐    │   │  │  │
-│  │  │   │  │  ELIGIBILITY-SERVICE                                            │    │   │  │  │
+│  │  │   │  │  CHECK-ELIGIBLE-SERVICE                                            │    │   │  │  │
 │  │  │   │  │  ├── server1:eligibility:8092 (172.18.0.2:8092) [LOCAL] ✓       │    │   │  │  │
 │  │  │   │  │  └── server3:eligibility:8092 (172.18.0.4:8092) [REMOTE]        │    │   │  │  │
 │  │  │   │  └─────────────────────────────────────────────────────────────────┘    │   │  │  │
@@ -739,14 +739,14 @@ How a service call is made using discovered instances and local-first load balan
 │  │  Step 1: Define Feign Client                                                          │  │
 │  │  ───────────────────────────                                                          │  │
 │  │                                                                                       │  │
-│  │  @FeignClient(name = "REFDATA-SERVICE")                                              │  │
-│  │  public interface RefDataClient {                                                    │  │
+│  │  @FeignClient(name = "REFERENCE-LOOKUP-SERVICE")                                              │  │
+│  │  public interface Reference LookupClient {                                                    │  │
 │  │                                                                                       │  │
 │  │      @GetMapping("/api/v1/refdata/{type}")                                           │  │
-│  │      RefDataResponse getRefData(@PathVariable String type);                          │  │
+│  │      Reference LookupResponse getReference Lookup(@PathVariable String type);                          │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
-│  │  // Note: "REFDATA-SERVICE" matches the app name in Eureka registry                  │  │
+│  │  // Note: "REFERENCE-LOOKUP-SERVICE" matches the app name in Eureka registry                  │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                             │
@@ -758,11 +758,11 @@ How a service call is made using discovered instances and local-first load balan
 │  │  public class IngestionService {                                                     │  │
 │  │                                                                                       │  │
 │  │      @Autowired                                                                      │  │
-│  │      private RefDataClient refDataClient;                                            │  │
+│  │      private Reference LookupClient refDataClient;                                            │  │
 │  │                                                                                       │  │
 │  │      public void processData(IngestRequest request) {                                │  │
 │  │          // This triggers the entire load balancing flow                             │  │
-│  │          RefDataResponse refData = refDataClient.getRefData("currency");             │  │
+│  │          Reference LookupResponse refData = refDataClient.getReference Lookup("currency");             │  │
 │  │      }                                                                                │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
@@ -789,17 +789,17 @@ How a service call is made using discovered instances and local-first load balan
 │  │                                                                                       │  │
 │  │  1. FeignClient Invocation                                                            │  │
 │  │     ─────────────────────────                                                         │  │
-│  │     refDataClient.getRefData("currency")                                              │  │
+│  │     refDataClient.getReference Lookup("currency")                                              │  │
 │  │                          │                                                            │  │
 │  │                          ▼                                                            │  │
 │  │  2. LoadBalancerFeignClient                                                           │  │
 │  │     ───────────────────────────                                                       │  │
-│  │     Intercepts the call, extracts service name "REFDATA-SERVICE"                      │  │
+│  │     Intercepts the call, extracts service name "REFERENCE-LOOKUP-SERVICE"                      │  │
 │  │                          │                                                            │  │
 │  │                          ▼                                                            │  │
 │  │  3. ReactiveLoadBalancer.choose(serviceId)                                            │  │
 │  │     ──────────────────────────────────────                                            │  │
-│  │     LocalFirstLoadBalancer.choose("REFDATA-SERVICE")                                  │  │
+│  │     LocalFirstLoadBalancer.choose("REFERENCE-LOOKUP-SERVICE")                                  │  │
 │  │                          │                                                            │  │
 │  │                          ▼                                                            │  │
 │  │  4. ServiceInstanceListSupplier.get()                                                 │  │
@@ -837,7 +837,7 @@ How a service call is made using discovered instances and local-first load balan
 │  │                          ▼                                                            │  │
 │  │  7. Response                                                                          │  │
 │  │     ────────                                                                          │  │
-│  │     RefDataResponse { ... }                                                           │  │
+│  │     Reference LookupResponse { ... }                                                           │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                             │
@@ -862,7 +862,7 @@ How retry logic works with the service registry when calls fail.
 │  │  resilience4j:                                                                        │  │
 │  │    retry:                                                                             │  │
 │  │      instances:                                                                       │  │
-│  │        refdata-service:                                                               │  │
+│  │        reference-lookup-service:                                                               │  │
 │  │          max-attempts: 3                                                              │  │
 │  │          wait-duration: 500ms                                                         │  │
 │  │          exponential-backoff-multiplier: 2                                            │  │
@@ -915,10 +915,10 @@ How retry logic works with the service registry when calls fail.
 │  │  FeignClient with Retry Decorator                                                     │  │
 │  │  ────────────────────────────────                                                     │  │
 │  │                                                                                       │  │
-│  │  @FeignClient(name = "REFDATA-SERVICE", configuration = FeignConfig.class)            │  │
-│  │  public interface RefDataClient {                                                     │  │
+│  │  @FeignClient(name = "REFERENCE-LOOKUP-SERVICE", configuration = FeignConfig.class)            │  │
+│  │  public interface Reference LookupClient {                                                     │  │
 │  │      @GetMapping("/api/v1/refdata/{type}")                                            │  │
-│  │      RefDataResponse getRefData(@PathVariable String type);                           │  │
+│  │      Reference LookupResponse getReference Lookup(@PathVariable String type);                           │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  │  @Configuration                                                                       │  │
@@ -940,17 +940,17 @@ How retry logic works with the service registry when calls fail.
 │  │  @Service                                                                             │  │
 │  │  public class IngestionService {                                                      │  │
 │  │                                                                                       │  │
-│  │      private final RefDataClient refDataClient;                                       │  │
+│  │      private final Reference LookupClient refDataClient;                                       │  │
 │  │      private final Retry retry;                                                       │  │
 │  │      private final ServiceInstanceRegistry instanceRegistry;                          │  │
 │  │                                                                                       │  │
 │  │      public IngestionService(                                                         │  │
-│  │              RefDataClient refDataClient,                                             │  │
+│  │              Reference LookupClient refDataClient,                                             │  │
 │  │              RetryRegistry retryRegistry,                                             │  │
 │  │              ServiceInstanceRegistry instanceRegistry) {                              │  │
 │  │                                                                                       │  │
 │  │          this.refDataClient = refDataClient;                                          │  │
-│  │          this.retry = retryRegistry.retry("refdata-service");                         │  │
+│  │          this.retry = retryRegistry.retry("reference-lookup-service");                         │  │
 │  │          this.instanceRegistry = instanceRegistry;                                    │  │
 │  │                                                                                       │  │
 │  │          // Add event listener for retry events                                       │  │
@@ -958,18 +958,18 @@ How retry logic works with the service registry when calls fail.
 │  │              .onRetry(event -> handleRetryEvent(event));                              │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      public RefDataResponse getRefDataWithRetry(String type) {                        │  │
-│  │          Supplier<RefDataResponse> supplier = () -> refDataClient.getRefData(type);   │  │
+│  │      public Reference LookupResponse getReference LookupWithRetry(String type) {                        │  │
+│  │          Supplier<Reference LookupResponse> supplier = () -> refDataClient.getReference Lookup(type);   │  │
 │  │                                                                                       │  │
 │  │          // Wrap with retry                                                           │  │
-│  │          Supplier<RefDataResponse> retryingSupplier =                                 │  │
+│  │          Supplier<Reference LookupResponse> retryingSupplier =                                 │  │
 │  │              Retry.decorateSupplier(retry, supplier);                                 │  │
 │  │                                                                                       │  │
 │  │          try {                                                                        │  │
 │  │              return retryingSupplier.get();                                           │  │
 │  │          } catch (Exception e) {                                                      │  │
 │  │              // All retries exhausted                                                 │  │
-│  │              throw new ServiceUnavailableException("RefData service unavailable", e); │  │
+│  │              throw new ServiceUnavailableException("Reference Lookup service unavailable", e); │  │
 │  │          }                                                                            │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
@@ -977,12 +977,12 @@ How retry logic works with the service registry when calls fail.
 │  │          // On retry, mark the failed instance as potentially unhealthy               │  │
 │  │          String lastAttemptedHost = getLastAttemptedHost();                           │  │
 │  │          instanceRegistry.markInstanceUnhealthy(                                      │  │
-│  │              "REFDATA-SERVICE",                                                       │  │
+│  │              "REFERENCE-LOOKUP-SERVICE",                                                       │  │
 │  │              lastAttemptedHost,                                                       │  │
 │  │              Duration.ofSeconds(30)  // Temporary unhealthy mark                      │  │
 │  │          );                                                                           │  │
 │  │                                                                                       │  │
-│  │          logger.warn("Retry attempt {} for RefData service. "                         │  │
+│  │          logger.warn("Retry attempt {} for Reference Lookup service. "                         │  │
 │  │              + "Marked {} as unhealthy. Reason: {}",                                  │  │
 │  │              event.getNumberOfRetryAttempts(),                                        │  │
 │  │              lastAttemptedHost,                                                       │  │
@@ -1068,7 +1068,7 @@ Comprehensive flow showing all components working together.
 │  │   ────────────────────────────────                                                          │    │
 │  │                                                                                             │    │
 │  │   ┌───────────────┐          ┌───────────────┐          ┌───────────────┐                   │    │
-│  │   │ RefData       │          │ Eligibility   │          │ Eureka        │                   │    │
+│  │   │ Reference Lookup       │          │ Eligibility   │          │ Eureka        │                   │    │
 │  │   │ Service       │          │ Service       │          │ Server        │                   │    │
 │  │   │ (server1)     │          │ (server1)     │          │ (server1)     │                   │    │
 │  │   └───────┬───────┘          └───────┬───────┘          └───────┬───────┘                   │    │
@@ -1089,7 +1089,7 @@ Comprehensive flow showing all components working together.
 │  │   ─────────────────────────────────────────────────────────────                             │    │
 │  │                                                                                             │    │
 │  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐          │    │
-│  │   │ Client        │    │ Ingestion     │    │ LocalFirst    │    │ RefData       │          │    │
+│  │   │ Client        │    │ Ingestion     │    │ LocalFirst    │    │ Reference Lookup       │          │    │
 │  │   │ Request       │    │ Service       │    │ LoadBalancer  │    │ Service       │          │    │
 │  │   │               │    │ (server1)     │    │               │    │ (server1)     │          │    │
 │  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘    └───────┬───────┘          │    │
@@ -1097,7 +1097,7 @@ Comprehensive flow showing all components working together.
 │  │           │ 1. POST /ingest    │                    │                    │                  │    │
 │  │           │───────────────────►│                    │                    │                  │    │
 │  │           │                    │                    │                    │                  │    │
-│  │           │                    │ 2. getRefData()    │                    │                  │    │
+│  │           │                    │ 2. getReference Lookup()    │                    │                  │    │
 │  │           │                    │───────────────────►│                    │                  │    │
 │  │           │                    │                    │                    │                  │    │
 │  │           │                    │                    │ 3. Get instances   │                  │    │
@@ -1113,7 +1113,7 @@ Comprehensive flow showing all components working together.
 │  │           │                    │                    │ 6. Response        │                  │    │
 │  │           │                    │                    │◄───────────────────│                  │    │
 │  │           │                    │                    │                    │                  │    │
-│  │           │                    │ 7. RefData Response│                    │                  │    │
+│  │           │                    │ 7. Reference Lookup Response│                    │                  │    │
 │  │           │                    │◄───────────────────│                    │                  │    │
 │  │           │                    │                    │                    │                  │    │
 │  │           │ 8. Ingest Response │                    │                    │                  │    │
@@ -1127,12 +1127,12 @@ Comprehensive flow showing all components working together.
 │  │   ───────────────────────────────────────────────────────                                   │    │
 │  │                                                                                             │    │
 │  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐          │    │
-│  │   │ Ingestion     │    │ Resilience4j  │    │ LocalFirst    │    │ RefData       │          │    │
+│  │   │ Ingestion     │    │ Resilience4j  │    │ LocalFirst    │    │ Reference Lookup       │          │    │
 │  │   │ Service       │    │ Retry         │    │ LoadBalancer  │    │ Services      │          │    │
 │  │   │ (server1)     │    │               │    │               │    │               │          │    │
 │  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘    └───────┬───────┘          │    │
 │  │           │                    │                    │                    │                  │    │
-│  │           │ 1. getRefData()    │                    │                    │                  │    │
+│  │           │ 1. getReference Lookup()    │                    │                    │                  │    │
 │  │           │───────────────────►│                    │                    │                  │    │
 │  │           │                    │                    │                    │                  │    │
 │  │           │                    │ 2. Execute         │                    │                  │    │
@@ -1183,7 +1183,7 @@ Comprehensive flow showing all components working together.
 │  │   ───────────────────────────────────                                                       │    │
 │  │                                                                                             │    │
 │  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐                               │    │
-│  │   │ Health        │    │ Service       │    │ RefData       │                               │    │
+│  │   │ Health        │    │ Service       │    │ Reference Lookup       │                               │    │
 │  │   │ Monitor       │    │ Instance      │    │ Service       │                               │    │
 │  │   │ (Executor)    │    │ Registry      │    │ (server1)     │                               │    │
 │  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘                               │    │
@@ -1215,7 +1215,7 @@ Comprehensive flow showing all components working together.
 │  │   ───────────────────────────────────────────                                               │    │
 │  │                                                                                             │    │
 │  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐                               │    │
-│  │   │ RefData       │    │ Eureka        │    │ Ingestion     │                               │    │
+│  │   │ Reference Lookup       │    │ Eureka        │    │ Ingestion     │                               │    │
 │  │   │ Service       │    │ Server        │    │ Service       │                               │    │
 │  │   │ (server1)     │    │               │    │ (Local Cache) │                               │    │
 │  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘                               │    │
@@ -1223,7 +1223,7 @@ Comprehensive flow showing all components working together.
 │  │           │ 1. SIGTERM         │                    │                                       │    │
 │  │           │    received        │                    │                                       │    │
 │  │           │                    │                    │                                       │    │
-│  │           │ 2. DELETE /eureka/apps/REFDATA-SERVICE/server1:refdata:8081                     │    │
+│  │           │ 2. DELETE /eureka/apps/REFERENCE-LOOKUP-SERVICE/server1:refdata:8081                     │    │
 │  │           │───────────────────►│                    │                                       │    │
 │  │           │                    │                    │                                       │    │
 │  │           │                    │ 3. Remove from     │                                       │    │

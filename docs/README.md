@@ -42,18 +42,18 @@ This POC implements a distributed microservices architecture with:
    │ └──────────┘ │    │ └──────────┘ │    │ └──────────┘ │    │ └──────────┘ │              │
    │              │    │              │    │              │    │              │              │
    │ ┌──────────┐ │    │ ┌──────────┐ │    │ ┌──────────┐ │    │ ┌──────────┐ │              │
-   │ │Ingestion │ │    │ │Ingestion │ │    │ │Ingestion │ │    │ │Ingestion │ │              │
+   │ │TradeRecv │ │    │ │TradeRecv │ │    │ │TradeRecv │ │    │ │TradeRecv │ │              │
    │ │(equity)  │ │    │ │(forex)   │ │    │ │(irswap)  │ │    │ │(support) │ │              │
    │ │ :8082    │ │    │ │ :8083    │ │    │ │ :8082    │ │    │ │ :8084    │ │              │
    │ └──────────┘ │    │ └──────────┘ │    │ └──────────┘ │    │ └──────────┘ │              │
    │              │    │              │    │              │    │              │              │
    │ ┌──────────┐ │    └──────────────┘    │ ┌──────────┐ │    └──────────────┘              │
-   │ │ RefData  │ │                        │ │Eligiblty │ │                                  │
+   │ │RefLookup │ │                        │ │ChkElig   │ │                                  │
    │ │ :8081    │ │                        │ │ :8092    │ │                                  │
    │ └──────────┘ │                        │ └──────────┘ │                                  │
    │              │                        │              │                                  │
    │ ┌──────────┐ │                        └──────────────┘                                  │
-   │ │Eligiblty │ │                                                                          │
+   │ │ChkElig   │ │                                                                          │
    │ │ :8092    │ │                                                                          │
    │ └──────────┘ │                                                                          │
    └──────────────┘                                                                          │
@@ -65,10 +65,10 @@ This POC implements a distributed microservices architecture with:
 | Service | Description | Port(s) | Servers |
 |---------|-------------|---------|---------|
 | **eureka-server** | Service Discovery | 8088 | 1, 4 |
-| **ingestion-service** | Data Ingestion | 8082-8084 | 1, 2, 3, 4 |
-| **regulatory-service** | Regulatory Processing | 8090 | 2 |
-| **refdata-service** | Reference Data | 8081 | 1, 3 |
-| **eligibility-service** | Eligibility Checking | 8092 | 1, 3 |
+| **trade-receiver-service** | Trade Receiver | 8082-8084 | 1, 2, 3, 4 |
+| **eq-trade-handler-service** | EQ Trade Handler | 8090 | 2 |
+| **reference-lookup-service** | Reference Lookup | 8081 | 1, 3 |
+| **check-eligible-service** | Check Eligible | 8092 | 1, 3 |
 
 ## Quick Start
 
@@ -111,17 +111,17 @@ docker-compose -f docker/server4/docker-compose.yml up -d
 # Start Eureka Server
 mvn spring-boot:run -pl eureka-server
 
-# Start RefData Service
-mvn spring-boot:run -pl refdata-service
+# Start Reference Lookup Service
+mvn spring-boot:run -pl reference-lookup-service
 
-# Start Eligibility Service
-mvn spring-boot:run -pl eligibility-service
+# Start Check Eligible Service
+mvn spring-boot:run -pl check-eligible-service
 
-# Start Ingestion Service (with profile)
-mvn spring-boot:run -pl ingestion-service -Dspring-boot.run.profiles=equity
+# Start Trade Receiver Service (with profile)
+mvn spring-boot:run -pl trade-receiver-service -Dspring-boot.run.profiles=equity
 
-# Start Regulatory Service
-mvn spring-boot:run -pl regulatory-service
+# Start EQ Trade Handler Service
+mvn spring-boot:run -pl eq-trade-handler-service
 ```
 
 ## Documentation
@@ -143,10 +143,10 @@ rdp-msa-viability-poc/
 ├── pom.xml                     # Parent POM
 ├── common/                     # Shared utilities
 ├── eureka-server/              # Service Discovery
-├── refdata-service/            # Reference Data Service
-├── eligibility-service/        # Eligibility Service
-├── ingestion-service/          # Ingestion Service
-├── regulatory-service/         # Regulatory Service
+├── reference-lookup-service/   # Reference Lookup Service
+├── check-eligible-service/     # Check Eligible Service
+├── trade-receiver-service/     # Trade Receiver Service
+├── eq-trade-handler-service/   # EQ Trade Handler Service
 ├── docker/                     # Docker configurations
 │   ├── server1/
 │   ├── server2/
