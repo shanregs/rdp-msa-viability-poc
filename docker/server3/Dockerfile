@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="BMO RDP Team"
-LABEL description="Server 3 - RefData, Ingestion (irswap), Eligibility"
+LABEL description="Server 3 - Reference Lookup, Trade Receiver (irswap), Check Eligible"
 
 # Install supervisor and utilities
 RUN apk add --no-cache supervisor bash curl
@@ -13,20 +13,20 @@ WORKDIR /app
 RUN mkdir -p /var/log
 
 # Copy service JARs (built from parent project)
-COPY refdata-service/target/refdata-service-*.jar /app/refdata-service.jar
-COPY ingestion-service/target/ingestion-service-*.jar /app/ingestion-service.jar
-COPY eligibility-service/target/eligibility-service-*.jar /app/eligibility-service.jar
+COPY reference-lookup-service/target/reference-lookup-service-*.jar /app/reference-lookup-service.jar
+COPY trade-receiver-service/target/trade-receiver-service-*.jar /app/trade-receiver-service.jar
+COPY check-eligible-service/target/check-eligible-service-*.jar /app/check-eligible-service.jar
 
 # Copy supervisor config
 COPY docker/server3/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose ports
-# 8081 - RefData Service
-# 8082 - Ingestion Service (irswap)
-# 8092 - Eligibility Service
+# 8081 - Reference Lookup Service
+# 8082 - Trade Receiver Service (irswap)
+# 8092 - Check Eligible Service
 EXPOSE 8081 8082 8092
 
-# Health check on RefData Service
+# Health check on Reference Lookup Service
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8081/actuator/health || exit 1
 

@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="BMO RDP Team"
-LABEL description="Server 4 - Eureka, Ingestion (supporteventhandler)"
+LABEL description="Server 4 - Eureka, Trade Receiver (supporteventhandler)"
 
 # Install supervisor and utilities
 RUN apk add --no-cache supervisor bash curl
@@ -14,14 +14,14 @@ RUN mkdir -p /var/log
 
 # Copy service JARs (built from parent project)
 COPY eureka-server/target/eureka-server-*.jar /app/eureka-server.jar
-COPY ingestion-service/target/ingestion-service-*.jar /app/ingestion-service.jar
+COPY trade-receiver-service/target/trade-receiver-service-*.jar /app/trade-receiver-service.jar
 
 # Copy supervisor config
 COPY docker/server4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose ports
 # 8088 - Eureka Server
-# 8084 - Ingestion Service (supporteventhandler)
+# 8084 - Trade Receiver Service (supporteventhandler)
 EXPOSE 8088 8084
 
 # Health check on Eureka

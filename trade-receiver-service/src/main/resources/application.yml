@@ -1,0 +1,141 @@
+server:
+  port: ${SERVER_PORT:8082}
+  id: ${SERVER_ID:server1}
+
+spring:
+  application:
+    name: trade-receiver-service
+  profiles:
+    active: ${PROFILE:equity}
+
+eureka:
+  instance:
+    hostname: ${HOSTNAME:localhost}
+    prefer-ip-address: false
+    instance-id: ${spring.application.name}:${server.id}:${server.port}
+    metadata-map:
+      server-id: ${server.id}
+      profile: ${spring.profiles.active}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8088/eureka}
+    registry-fetch-interval-seconds: 10
+  # Local-first load balancing configuration
+  sync:
+    services: reference-lookup-service,check-eligible-service
+    interval: 30000
+
+# Health monitoring
+health:
+  monitor:
+    enabled: true
+    interval: 10
+    timeout: 5
+
+# Resilience4j configuration
+resilience4j:
+  retry:
+    instances:
+      referenceLookup:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - feign.FeignException
+      checkEligible:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - feign.FeignException
+      tradeProcessing:
+        max-attempts: 2
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+
+  circuitbreaker:
+    instances:
+      referenceLookup:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+      checkEligible:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+      tradeProcessing:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,retries
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+logging:
+  level:
+    com.bmo.rdp: DEBUG
+    com.netflix.eureka: INFO
+    com.netflix.discovery: INFO
+    io.github.resilience4j: DEBUG
+
+---
+# Equity profile (Server 1)
+spring:
+  config:
+    activate:
+      on-profile: equity
+server:
+  port: 8082
+
+---
+# Forex profile (Server 2)
+spring:
+  config:
+    activate:
+      on-profile: forex
+server:
+  port: 8083
+
+---
+# IRSwap profile (Server 3)
+spring:
+  config:
+    activate:
+      on-profile: irswap
+server:
+  port: 8082
+
+---
+# Support Event Handler profile (Server 4)
+spring:
+  config:
+    activate:
+      on-profile: supporteventhandler
+server:
+  port: 8084

@@ -1,0 +1,40 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: eureka-server
+
+eureka:
+  instance:
+    hostname: ${HOSTNAME:localhost}
+    prefer-ip-address: false
+    instance-id: ${spring.application.name}:${server.port}
+    metadata-map:
+      server-id: ${SERVER_ID:server1}
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8088/eureka}
+  server:
+    # Disable self-preservation for POC (in production, enable this)
+    enable-self-preservation: false
+    # Faster eviction for POC
+    eviction-interval-timer-in-ms: 5000
+    # Response cache update interval
+    response-cache-update-interval-ms: 3000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.netflix.eureka: INFO
+    com.netflix.discovery: INFO
