@@ -8,7 +8,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * This enables the local-first load balancing strategy.
  */
 @Component
-@ConditionalOnBean(EurekaClient.class)
+@ConditionalOnClass(EurekaClient.class)
 public class EurekaRegistrySync {
 
     private static final Logger log = LoggerFactory.getLogger(EurekaRegistrySync.class);
@@ -61,7 +61,7 @@ public class EurekaRegistrySync {
     private void syncService(String serviceId) {
         Application application = eurekaClient.getApplication(serviceId.toUpperCase());
         if (application == null) {
-            log.debug("No instances found for service: {}", serviceId);
+            log.warn("No instances found in Eureka for service: {}", serviceId);
             return;
         }
 
@@ -81,7 +81,7 @@ public class EurekaRegistrySync {
                 .collect(Collectors.toList());
 
         registry.updateInstances(serviceId, instances);
-        log.debug("Synced {} instances for service {} (local: {})",
+        log.info("Synced {} instances for service {} (local: {})",
                 instances.size(), serviceId,
                 instances.stream().filter(ServiceInstanceInfo::isLocal).count());
     }
