@@ -38,14 +38,14 @@ When a service instance starts, it registers itself with the Eureka Server.
          │  ──────────────────────────────────────────────────────►│
          │     Body: InstanceInfo JSON                             │
          │     {                                                   │
-         │       "instanceId": "server1:refdata:8081",            │
+         │       "instanceId": "server1:refdata:8081",             │
          │       "hostName": "server1",                            │
          │       "app": "REFDATA-SERVICE",                         │
-         │       "ipAddr": "172.18.0.2",                          │
-         │       "port": { "$": 8081, "@enabled": true },         │
+         │       "ipAddr": "172.18.0.2",                           │
+         │       "port": { "$": 8081, "@enabled": true },          │
          │       "status": "UP",                                   │
          │       "healthCheckUrl": "http://server1:8081/actuator/health",
-         │       "metadata": { "server-id": "server1" }           │
+         │       "metadata": { "server-id": "server1" }            │
          │     }                                                   │
          │                            │                            │
          │                            │  3. Validate InstanceInfo  │
@@ -89,18 +89,18 @@ When a service instance starts, it registers itself with the Eureka Server.
 │  │                                                                                       │  │
 │  │  @POST                                                                                │  │
 │  │  @Path("/{appName}")                                                                  │  │
-│  │  public Response addInstance(InstanceInfo info) {                                    │  │
+│  │  public Response addInstance(InstanceInfo info) {                                     │  │
 │  │                                                                                       │  │
-│  │      // 1. Validate the incoming InstanceInfo                                        │  │
-│  │      if (info == null || info.getId() == null) {                                     │  │
-│  │          return Response.status(400).build();                                        │  │
+│  │      // 1. Validate the incoming InstanceInfo                                         │  │
+│  │      if (info == null || info.getId() == null) {                                      │  │
+│  │          return Response.status(400).build();                                         │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      // 2. Register with the registry                                                │  │
-│  │      registry.register(info, "true".equals(isReplication));                          │  │
+│  │      // 2. Register with the registry                                                 │  │
+│  │      registry.register(info, "true".equals(isReplication));                           │  │
 │  │                                                                                       │  │
-│  │      // 3. Return success                                                            │  │
-│  │      return Response.status(204).build();                                            │  │
+│  │      // 3. Return success                                                             │  │
+│  │      return Response.status(204).build();                                             │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
@@ -411,24 +411,24 @@ Client services fetch the registry to discover available service instances.
 │  │                                                                                       │  │
 │  │  @GET                                                                                 │  │
 │  │  @Path("/apps")                                                                       │  │
-│  │  public Response getApplications(@HeaderParam("Accept") String acceptHeader) {       │  │
+│  │  public Response getApplications(@HeaderParam("Accept") String acceptHeader) {        │  │
 │  │                                                                                       │  │
-│  │      // 1. Check response cache first (for performance)                              │  │
-│  │      String cacheKey = buildCacheKey(acceptHeader);                                  │  │
-│  │      String payload = responseCache.get(cacheKey);                                   │  │
+│  │      // 1. Check response cache first (for performance)                               │  │
+│  │      String cacheKey = buildCacheKey(acceptHeader);                                   │  │
+│  │      String payload = responseCache.get(cacheKey);                                    │  │
 │  │                                                                                       │  │
-│  │      if (payload != null) {                                                          │  │
-│  │          return Response.ok(payload).build();                                        │  │
+│  │      if (payload != null) {                                                           │  │
+│  │          return Response.ok(payload).build();                                         │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      // 2. Build applications from registry                                          │  │
-│  │      Applications apps = registry.getApplications();                                 │  │
+│  │      // 2. Build applications from registry                                           │  │
+│  │      Applications apps = registry.getApplications();                                  │  │
 │  │                                                                                       │  │
-│  │      // 3. Serialize and cache                                                       │  │
-│  │      payload = serialize(apps, acceptHeader);                                        │  │
-│  │      responseCache.put(cacheKey, payload);                                           │  │
+│  │      // 3. Serialize and cache                                                        │  │
+│  │      payload = serialize(apps, acceptHeader);                                         │  │
+│  │      responseCache.put(cacheKey, payload);                                            │  │
 │  │                                                                                       │  │
-│  │      return Response.ok(payload).build();                                            │  │
+│  │      return Response.ok(payload).build();                                             │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
@@ -438,33 +438,33 @@ Client services fetch the registry to discover available service instances.
 │  │  AbstractInstanceRegistry.getApplications()                                           │  │
 │  │  ──────────────────────────────────────────                                           │  │
 │  │                                                                                       │  │
-│  │  public Applications getApplications() {                                             │  │
-│  │      Applications apps = new Applications();                                         │  │
+│  │  public Applications getApplications() {                                              │  │
+│  │      Applications apps = new Applications();                                          │  │
 │  │                                                                                       │  │
-│  │      // Iterate through all registered applications                                  │  │
-│  │      for (Entry<String, Map<String, Lease<InstanceInfo>>> entry :                    │  │
-│  │           registry.entrySet()) {                                                     │  │
+│  │      // Iterate through all registered applications                                   │  │
+│  │      for (Entry<String, Map<String, Lease<InstanceInfo>>> entry :                     │  │
+│  │           registry.entrySet()) {                                                      │  │
 │  │                                                                                       │  │
-│  │          Application app = new Application(entry.getKey());                          │  │
+│  │          Application app = new Application(entry.getKey());                           │  │
 │  │                                                                                       │  │
-│  │          // Add all instances for this application                                   │  │
-│  │          for (Entry<String, Lease<InstanceInfo>> instanceEntry :                     │  │
-│  │               entry.getValue().entrySet()) {                                         │  │
+│  │          // Add all instances for this application                                    │  │
+│  │          for (Entry<String, Lease<InstanceInfo>> instanceEntry :                      │  │
+│  │               entry.getValue().entrySet()) {                                          │  │
 │  │                                                                                       │  │
-│  │              Lease<InstanceInfo> lease = instanceEntry.getValue();                   │  │
-│  │              InstanceInfo info = lease.getHolder();                                  │  │
+│  │              Lease<InstanceInfo> lease = instanceEntry.getValue();                    │  │
+│  │              InstanceInfo info = lease.getHolder();                                   │  │
 │  │                                                                                       │  │
-│  │              // Only include UP instances (or as configured)                         │  │
-│  │              if (info.getStatus() == InstanceStatus.UP) {                            │  │
-│  │                  app.addInstance(info);                                              │  │
+│  │              // Only include UP instances (or as configured)                          │  │
+│  │              if (info.getStatus() == InstanceStatus.UP) {                             │  │
+│  │                  app.addInstance(info);                                               │  │
 │  │              }                                                                        │  │
 │  │          }                                                                            │  │
 │  │                                                                                       │  │
-│  │          apps.addApplication(app);                                                   │  │
+│  │          apps.addApplication(app);                                                    │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      apps.setAppsHashCode(computeAppsHashCode());                                    │  │
-│  │      return apps;                                                                    │  │
+│  │      apps.setAppsHashCode(computeAppsHashCode());                                     │  │
+│  │      return apps;                                                                     │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
@@ -582,14 +582,14 @@ When a service instance shuts down gracefully, it deregisters from Eureka.
 │  │  @DELETE                                                                              │  │
 │  │  public Response cancelLease() {                                                      │  │
 │  │                                                                                       │  │
-│  │      // 1. Cancel the lease                                                          │  │
-│  │      boolean success = registry.cancel(appName, instanceId, isReplication);          │  │
+│  │      // 1. Cancel the lease                                                           │  │
+│  │      boolean success = registry.cancel(appName, instanceId, isReplication);           │  │
 │  │                                                                                       │  │
-│  │      if (!success) {                                                                 │  │
-│  │          return Response.status(404).build();                                        │  │
+│  │      if (!success) {                                                                  │  │
+│  │          return Response.status(404).build();                                         │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      return Response.ok().build();                                                   │  │
+│  │      return Response.ok().build();                                                    │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
@@ -599,40 +599,40 @@ When a service instance shuts down gracefully, it deregisters from Eureka.
 │  │  PeerAwareInstanceRegistryImpl.cancel()                                               │  │
 │  │  ──────────────────────────────────────                                               │  │
 │  │                                                                                       │  │
-│  │  public boolean cancel(String appName, String id, boolean isReplication) {           │  │
+│  │  public boolean cancel(String appName, String id, boolean isReplication) {            │  │
 │  │                                                                                       │  │
-│  │      // 1. Cancel in local registry                                                  │  │
-│  │      boolean success = internalCancel(appName, id);                                  │  │
+│  │      // 1. Cancel in local registry                                                   │  │
+│  │      boolean success = internalCancel(appName, id);                                   │  │
 │  │                                                                                       │  │
-│  │      // 2. Replicate to peers                                                        │  │
-│  │      if (success && !isReplication) {                                                │  │
-│  │          replicateToPeers(Action.Cancel, appName, id);                               │  │
+│  │      // 2. Replicate to peers                                                         │  │
+│  │      if (success && !isReplication) {                                                 │  │
+│  │          replicateToPeers(Action.Cancel, appName, id);                                │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      return success;                                                                 │  │
+│  │      return success;                                                                  │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
-│  │  protected boolean internalCancel(String appName, String id) {                       │  │
+│  │  protected boolean internalCancel(String appName, String id) {                        │  │
 │  │                                                                                       │  │
-│  │      Map<String, Lease<InstanceInfo>> gMap = registry.get(appName);                  │  │
-│  │      if (gMap == null) return false;                                                 │  │
+│  │      Map<String, Lease<InstanceInfo>> gMap = registry.get(appName);                   │  │
+│  │      if (gMap == null) return false;                                                  │  │
 │  │                                                                                       │  │
-│  │      Lease<InstanceInfo> lease = gMap.remove(id);                                    │  │
-│  │      if (lease == null) return false;                                                │  │
+│  │      Lease<InstanceInfo> lease = gMap.remove(id);                                     │  │
+│  │      if (lease == null) return false;                                                 │  │
 │  │                                                                                       │  │
-│  │      // Mark eviction timestamp                                                      │  │
-│  │      lease.cancel();                                                                 │  │
+│  │      // Mark eviction timestamp                                                       │  │
+│  │      lease.cancel();                                                                  │  │
 │  │                                                                                       │  │
-│  │      // Add to recently cancelled queue (for delta)                                  │  │
-│  │      recentlyCancelledQueue.add(new Pair<>(                                          │  │
-│  │          System.currentTimeMillis(),                                                 │  │
-│  │          lease.getHolder()                                                           │  │
+│  │      // Add to recently cancelled queue (for delta)                                   │  │
+│  │      recentlyCancelledQueue.add(new Pair<>(                                           │  │
+│  │          System.currentTimeMillis(),                                                  │  │
+│  │          lease.getHolder()                                                            │  │
 │  │      ));                                                                              │  │
 │  │                                                                                       │  │
-│  │      // Invalidate response cache                                                    │  │
-│  │      invalidateCache(appName);                                                       │  │
+│  │      // Invalidate response cache                                                     │  │
+│  │      invalidateCache(appName);                                                        │  │
 │  │                                                                                       │  │
-│  │      return true;                                                                    │  │
+│  │      return true;                                                                     │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
@@ -658,11 +658,11 @@ How services discover and cache available instances locally.
 │  │  @SpringBootApplication                                                               │  │
 │  │  @EnableDiscoveryClient                                                               │  │
 │  │  @EnableFeignClients                                                                  │  │
-│  │  public class IngestionServiceApplication {                                          │  │
-│  │      // Spring Cloud auto-configures:                                                │  │
-│  │      // - EurekaClient (service registration)                                        │  │
-│  │      // - DiscoveryClient (service discovery)                                        │  │
-│  │      // - LoadBalancerClient (client-side LB)                                        │  │
+│  │  public class IngestionServiceApplication {                                           │  │
+│  │      // Spring Cloud auto-configures:                                                 │  │
+│  │      // - EurekaClient (service registration)                                         │  │
+│  │      // - DiscoveryClient (service discovery)                                         │  │
+│  │      // - LoadBalancerClient (client-side LB)                                         │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
@@ -679,19 +679,19 @@ How services discover and cache available instances locally.
 │  │  │   │                                                                         │   │  │  │
 │  │  │   │  ┌─────────────────────────────────────────────────────────────────┐    │   │  │  │
 │  │  │   │  │  REFDATA-SERVICE                                                │    │   │  │  │
-│  │  │   │  │  ├── server1:refdata:8081 (172.18.0.2:8081) [LOCAL] ✓          │    │   │  │  │
-│  │  │   │  │  └── server3:refdata:8081 (172.18.0.4:8081) [REMOTE]           │    │   │  │  │
+│  │  │   │  │  ├── server1:refdata:8081 (172.18.0.2:8081) [LOCAL] ✓           │    │   │  │  │
+│  │  │   │  │  └── server3:refdata:8081 (172.18.0.4:8081) [REMOTE]            │    │   │  │  │
 │  │  │   │  └─────────────────────────────────────────────────────────────────┘    │   │  │  │
 │  │  │   │                                                                         │   │  │  │
 │  │  │   │  ┌─────────────────────────────────────────────────────────────────┐    │   │  │  │
 │  │  │   │  │  ELIGIBILITY-SERVICE                                            │    │   │  │  │
-│  │  │   │  │  ├── server1:eligibility:8092 (172.18.0.2:8092) [LOCAL] ✓      │    │   │  │  │
-│  │  │   │  │  └── server3:eligibility:8092 (172.18.0.4:8092) [REMOTE]       │    │   │  │  │
+│  │  │   │  │  ├── server1:eligibility:8092 (172.18.0.2:8092) [LOCAL] ✓       │    │   │  │  │
+│  │  │   │  │  └── server3:eligibility:8092 (172.18.0.4:8092) [REMOTE]        │    │   │  │  │
 │  │  │   │  └─────────────────────────────────────────────────────────────────┘    │   │  │  │
 │  │  │   │                                                                         │   │  │  │
 │  │  │   │  ┌─────────────────────────────────────────────────────────────────┐    │   │  │  │
 │  │  │   │  │  REGULATORY-SERVICE                                             │    │   │  │  │
-│  │  │   │  │  └── server2:regulatory:8090 (172.18.0.3:8090) [REMOTE]        │    │   │  │  │
+│  │  │   │  │  └── server2:regulatory:8090 (172.18.0.3:8090) [REMOTE]         │    │   │  │  │
 │  │  │   │  └─────────────────────────────────────────────────────────────────┘    │   │  │  │
 │  │  │   │                                                                         │   │  │  │
 │  │  │   │  Last Refresh: 2024-01-01 10:00:30                                      │   │  │  │
@@ -707,17 +707,17 @@ How services discover and cache available instances locally.
 │  │  Cache Refresh Timeline                                                               │  │
 │  │  ──────────────────────                                                               │  │
 │  │                                                                                       │  │
-│  │  Time ────────────────────────────────────────────────────────────────────────────►  │  │
+│  │  Time ────────────────────────────────────────────────────────────────────────────►   │  │
 │  │                                                                                       │  │
-│  │  0s         30s        60s        90s        120s                                    │  │
-│  │  │          │          │          │          │                                       │  │
-│  │  ▼          ▼          ▼          ▼          ▼                                       │  │
-│  │  ┌──┐       ┌─┐        ┌─┐        ┌─┐        ┌─┐                                     │  │
-│  │  │FF│       │D│        │D│        │D│        │D│                                     │  │
-│  │  └──┘       └─┘        └─┘        └─┘        └─┘                                     │  │
+│  │  0s         30s        60s        90s        120s                                     │  │
+│  │  │          │          │          │          │                                        │  │
+│  │  ▼          ▼          ▼          ▼          ▼                                        │  │
+│  │  ┌──┐       ┌─┐        ┌─┐        ┌─┐        ┌─┐                                      │  │
+│  │  │FF│       │D│        │D│        │D│        │D│                                      │  │
+│  │  └──┘       └─┘        └─┘        └─┘        └─┘                                      │  │
 │  │                                                                                       │  │
-│  │  FF = Full Fetch (on startup)                                                        │  │
-│  │  D  = Delta Fetch (incremental)                                                      │  │
+│  │  FF = Full Fetch (on startup)                                                         │  │
+│  │  D  = Delta Fetch (incremental)                                                       │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                             │
@@ -778,66 +778,66 @@ How a service call is made using discovered instances and local-first load balan
 │                     INTERNAL CALL FLOW (What happens behind the scenes)                     │
 │                                                                                             │
 │                                                                                             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌───────────┐ │
-│  │  Feign      │    │  Load       │    │  Service    │    │  Local-First│    │  HTTP     │ │
-│  │  Client     │───►│  Balancer   │───►│  Instance   │───►│  Selector   │───►│  Request  │ │
-│  │             │    │  Interceptor│    │  List       │    │             │    │           │ │
-│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └───────────┘ │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌───────────┐  │
+│  │  Feign      │    │  Load       │    │  Service    │    │  Local-First│    │  HTTP     │  │
+│  │  Client     │───►│  Balancer   │───►│  Instance   │───►│  Selector   │───►│  Request  │  │
+│  │             │    │  Interceptor│    │  List       │    │             │    │           │  │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └───────────┘  │
 │                                                                                             │
 │                                                                                             │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                                                                                       │  │
-│  │  1. FeignClient Invocation                                                           │  │
-│  │     ─────────────────────────                                                        │  │
-│  │     refDataClient.getRefData("currency")                                             │  │
-│  │                          │                                                           │  │
-│  │                          ▼                                                           │  │
-│  │  2. LoadBalancerFeignClient                                                          │  │
-│  │     ───────────────────────────                                                      │  │
-│  │     Intercepts the call, extracts service name "REFDATA-SERVICE"                     │  │
-│  │                          │                                                           │  │
-│  │                          ▼                                                           │  │
-│  │  3. ReactiveLoadBalancer.choose(serviceId)                                           │  │
-│  │     ──────────────────────────────────────                                           │  │
-│  │     LocalFirstLoadBalancer.choose("REFDATA-SERVICE")                                 │  │
-│  │                          │                                                           │  │
-│  │                          ▼                                                           │  │
-│  │  4. ServiceInstanceListSupplier.get()                                                │  │
-│  │     ─────────────────────────────────                                                │  │
-│  │     Retrieves instances from local cache:                                            │  │
-│  │     [                                                                                │  │
-│  │       { host: "server1", port: 8081, metadata: { server-id: "server1" } },          │  │
-│  │       { host: "server3", port: 8081, metadata: { server-id: "server3" } }           │  │
-│  │     ]                                                                                │  │
-│  │                          │                                                           │  │
-│  │                          ▼                                                           │  │
-│  │  5. Local-First Selection Algorithm                                                  │  │
-│  │     ──────────────────────────────────                                               │  │
-│  │     String currentServer = System.getenv("SERVER_ID");  // "server1"                │  │
+│  │  1. FeignClient Invocation                                                            │  │
+│  │     ─────────────────────────                                                         │  │
+│  │     refDataClient.getRefData("currency")                                              │  │
+│  │                          │                                                            │  │
+│  │                          ▼                                                            │  │
+│  │  2. LoadBalancerFeignClient                                                           │  │
+│  │     ───────────────────────────                                                       │  │
+│  │     Intercepts the call, extracts service name "REFDATA-SERVICE"                      │  │
+│  │                          │                                                            │  │
+│  │                          ▼                                                            │  │
+│  │  3. ReactiveLoadBalancer.choose(serviceId)                                            │  │
+│  │     ──────────────────────────────────────                                            │  │
+│  │     LocalFirstLoadBalancer.choose("REFDATA-SERVICE")                                  │  │
+│  │                          │                                                            │  │
+│  │                          ▼                                                            │  │
+│  │  4. ServiceInstanceListSupplier.get()                                                 │  │
+│  │     ─────────────────────────────────                                                 │  │
+│  │     Retrieves instances from local cache:                                             │  │
+│  │     [                                                                                 │  │
+│  │       { host: "server1", port: 8081, metadata: { server-id: "server1" } },            │  │
+│  │       { host: "server3", port: 8081, metadata: { server-id: "server3" } }             │  │
+│  │     ]                                                                                 │  │
+│  │                          │                                                            │  │
+│  │                          ▼                                                            │  │
+│  │  5. Local-First Selection Algorithm                                                   │  │
+│  │     ──────────────────────────────────                                                │  │
+│  │     String currentServer = System.getenv("SERVER_ID");  // "server1"                  │  │
 │  │                                                                                       │  │
-│  │     // Find local instance                                                           │  │
-│  │     ServiceInstance local = instances.stream()                                       │  │
-│  │         .filter(i -> i.getMetadata().get("server-id").equals(currentServer))        │  │
-│  │         .findFirst()                                                                 │  │
-│  │         .orElse(null);                                                               │  │
+│  │     // Find local instance                                                            │  │
+│  │     ServiceInstance local = instances.stream()                                        │  │
+│  │         .filter(i -> i.getMetadata().get("server-id").equals(currentServer))          │  │
+│  │         .findFirst()                                                                  │  │
+│  │         .orElse(null);                                                                │  │
 │  │                                                                                       │  │
-│  │     if (local != null && local.isHealthy()) {                                        │  │
-│  │         return local;  // ✓ Return local instance                                   │  │
+│  │     if (local != null && local.isHealthy()) {                                         │  │
+│  │         return local;  // ✓ Return local instance                                     │  │
 │  │     }                                                                                 │  │
 │  │                                                                                       │  │
-│  │     // Fallback: select by load                                                      │  │
-│  │     return selectByLowestLoad(instances);                                            │  │
-│  │                          │                                                           │  │
-│  │                          ▼                                                           │  │
-│  │  6. HTTP Request Execution                                                           │  │
-│  │     ─────────────────────────                                                        │  │
-│  │     GET http://server1:8081/api/v1/refdata/currency                                 │  │
-│  │     (Local call - no network hop)                                                    │  │
-│  │                          │                                                           │  │
-│  │                          ▼                                                           │  │
-│  │  7. Response                                                                         │  │
-│  │     ────────                                                                         │  │
-│  │     RefDataResponse { ... }                                                          │  │
+│  │     // Fallback: select by load                                                       │  │
+│  │     return selectByLowestLoad(instances);                                             │  │
+│  │                          │                                                            │  │
+│  │                          ▼                                                            │  │
+│  │  6. HTTP Request Execution                                                            │  │
+│  │     ─────────────────────────                                                         │  │
+│  │     GET http://server1:8081/api/v1/refdata/currency                                   │  │
+│  │     (Local call - no network hop)                                                     │  │
+│  │                          │                                                            │  │
+│  │                          ▼                                                            │  │
+│  │  7. Response                                                                          │  │
+│  │     ────────                                                                          │  │
+│  │     RefDataResponse { ... }                                                           │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                             │
@@ -859,17 +859,17 @@ How retry logic works with the service registry when calls fail.
 │  │  Resilience4j Configuration                                                           │  │
 │  │  ──────────────────────────                                                           │  │
 │  │                                                                                       │  │
-│  │  resilience4j:                                                                       │  │
-│  │    retry:                                                                            │  │
-│  │      instances:                                                                      │  │
-│  │        refdata-service:                                                              │  │
-│  │          max-attempts: 3                                                             │  │
-│  │          wait-duration: 500ms                                                        │  │
-│  │          exponential-backoff-multiplier: 2                                           │  │
-│  │          retry-exceptions:                                                           │  │
-│  │            - java.io.IOException                                                     │  │
-│  │            - java.net.ConnectException                                               │  │
-│  │            - java.util.concurrent.TimeoutException                                   │  │
+│  │  resilience4j:                                                                        │  │
+│  │    retry:                                                                             │  │
+│  │      instances:                                                                       │  │
+│  │        refdata-service:                                                               │  │
+│  │          max-attempts: 3                                                              │  │
+│  │          wait-duration: 500ms                                                         │  │
+│  │          exponential-backoff-multiplier: 2                                            │  │
+│  │          retry-exceptions:                                                            │  │
+│  │            - java.io.IOException                                                      │  │
+│  │            - java.net.ConnectException                                                │  │
+│  │            - java.util.concurrent.TimeoutException                                    │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                             │
@@ -878,26 +878,26 @@ How retry logic works with the service registry when calls fail.
 │  │  ────────────────────────────────────                                                 │  │
 │  │                                                                                       │  │
 │  │                                                                                       │  │
-│  │   Attempt 1 (Local)              Attempt 2 (Remote)           Attempt 3 (Remote)     │  │
-│  │   ─────────────────              ──────────────────           ─────────────────      │  │
+│  │   Attempt 1 (Local)              Attempt 2 (Remote)           Attempt 3 (Remote)      │  │
+│  │   ─────────────────              ──────────────────           ─────────────────       │  │
 │  │                                                                                       │  │
-│  │   ┌─────────────────┐            ┌─────────────────┐          ┌─────────────────┐    │  │
-│  │   │ server1:8081    │            │ server3:8081    │          │ server3:8081    │    │  │
-│  │   │ (LOCAL)         │            │ (REMOTE)        │          │ (REMOTE)        │    │  │
-│  │   └────────┬────────┘            └────────┬────────┘          └────────┬────────┘    │  │
-│  │            │                              │                            │             │  │
-│  │            ▼                              ▼                            ▼             │  │
-│  │       ╔═══════╗                      ╔═══════╗                    ╔═══════╗          │  │
-│  │       ║ FAIL  ║                      ║ FAIL  ║                    ║SUCCESS║          │  │
-│  │       ║Timeout║                      ║ConnErr║                    ║  200  ║          │  │
-│  │       ╚═══════╝                      ╚═══════╝                    ╚═══════╝          │  │
-│  │            │                              │                            │             │  │
-│  │            │   Wait 500ms                 │   Wait 1000ms              │             │  │
-│  │            │   ──────────                 │   ───────────              │             │  │
-│  │            ▼                              ▼                            ▼             │  │
-│  │       Mark server1                   Mark server3                 Return             │  │
-│  │       unhealthy                      unhealthy                    Response           │  │
-│  │       (temporary)                    (temporary)                                     │  │
+│  │   ┌─────────────────┐            ┌─────────────────┐          ┌─────────────────┐     │  │
+│  │   │ server1:8081    │            │ server3:8081    │          │ server3:8081    │     │  │
+│  │   │ (LOCAL)         │            │ (REMOTE)        │          │ (REMOTE)        │     │  │
+│  │   └────────┬────────┘            └────────┬────────┘          └────────┬────────┘     │  │
+│  │            │                              │                            │              │  │
+│  │            ▼                              ▼                            ▼              │  │
+│  │       ╔═══════╗                      ╔═══════╗                    ╔═══════╗           │  │
+│  │       ║ FAIL  ║                      ║ FAIL  ║                    ║SUCCESS║           │  │
+│  │       ║Timeout║                      ║ConnErr║                    ║  200  ║           │  │
+│  │       ╚═══════╝                      ╚═══════╝                    ╚═══════╝           │  │
+│  │            │                              │                            │              │  │
+│  │            │   Wait 500ms                 │   Wait 1000ms              │              │  │
+│  │            │   ──────────                 │   ───────────              │              │  │
+│  │            ▼                              ▼                            ▼              │  │
+│  │       Mark server1                   Mark server3                 Return              │  │
+│  │       unhealthy                      unhealthy                    Response            │  │
+│  │       (temporary)                    (temporary)                                      │  │
 │  │                                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                             │
@@ -915,19 +915,19 @@ How retry logic works with the service registry when calls fail.
 │  │  FeignClient with Retry Decorator                                                     │  │
 │  │  ────────────────────────────────                                                     │  │
 │  │                                                                                       │  │
-│  │  @FeignClient(name = "REFDATA-SERVICE", configuration = FeignConfig.class)           │  │
-│  │  public interface RefDataClient {                                                    │  │
-│  │      @GetMapping("/api/v1/refdata/{type}")                                           │  │
-│  │      RefDataResponse getRefData(@PathVariable String type);                          │  │
+│  │  @FeignClient(name = "REFDATA-SERVICE", configuration = FeignConfig.class)            │  │
+│  │  public interface RefDataClient {                                                     │  │
+│  │      @GetMapping("/api/v1/refdata/{type}")                                            │  │
+│  │      RefDataResponse getRefData(@PathVariable String type);                           │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
-│  │  @Configuration                                                                      │  │
-│  │  public class FeignConfig {                                                          │  │
+│  │  @Configuration                                                                       │  │
+│  │  public class FeignConfig {                                                           │  │
 │  │                                                                                       │  │
-│  │      @Bean                                                                           │  │
-│  │      public Retryer retryer() {                                                      │  │
-│  │          // Disable Feign's built-in retry (use Resilience4j instead)               │  │
-│  │          return Retryer.NEVER_RETRY;                                                 │  │
+│  │      @Bean                                                                            │  │
+│  │      public Retryer retryer() {                                                       │  │
+│  │          // Disable Feign's built-in retry (use Resilience4j instead)                 │  │
+│  │          return Retryer.NEVER_RETRY;                                                  │  │
 │  │      }                                                                                │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
@@ -937,56 +937,56 @@ How retry logic works with the service registry when calls fail.
 │  │  Service Layer with Resilience4j Retry                                                │  │
 │  │  ─────────────────────────────────────                                                │  │
 │  │                                                                                       │  │
-│  │  @Service                                                                            │  │
-│  │  public class IngestionService {                                                     │  │
+│  │  @Service                                                                             │  │
+│  │  public class IngestionService {                                                      │  │
 │  │                                                                                       │  │
-│  │      private final RefDataClient refDataClient;                                      │  │
-│  │      private final Retry retry;                                                      │  │
-│  │      private final ServiceInstanceRegistry instanceRegistry;                         │  │
+│  │      private final RefDataClient refDataClient;                                       │  │
+│  │      private final Retry retry;                                                       │  │
+│  │      private final ServiceInstanceRegistry instanceRegistry;                          │  │
 │  │                                                                                       │  │
-│  │      public IngestionService(                                                        │  │
-│  │              RefDataClient refDataClient,                                            │  │
-│  │              RetryRegistry retryRegistry,                                            │  │
-│  │              ServiceInstanceRegistry instanceRegistry) {                             │  │
+│  │      public IngestionService(                                                         │  │
+│  │              RefDataClient refDataClient,                                             │  │
+│  │              RetryRegistry retryRegistry,                                             │  │
+│  │              ServiceInstanceRegistry instanceRegistry) {                              │  │
 │  │                                                                                       │  │
-│  │          this.refDataClient = refDataClient;                                         │  │
-│  │          this.retry = retryRegistry.retry("refdata-service");                        │  │
-│  │          this.instanceRegistry = instanceRegistry;                                   │  │
+│  │          this.refDataClient = refDataClient;                                          │  │
+│  │          this.retry = retryRegistry.retry("refdata-service");                         │  │
+│  │          this.instanceRegistry = instanceRegistry;                                    │  │
 │  │                                                                                       │  │
-│  │          // Add event listener for retry events                                      │  │
-│  │          retry.getEventPublisher()                                                   │  │
-│  │              .onRetry(event -> handleRetryEvent(event));                             │  │
+│  │          // Add event listener for retry events                                       │  │
+│  │          retry.getEventPublisher()                                                    │  │
+│  │              .onRetry(event -> handleRetryEvent(event));                              │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      public RefDataResponse getRefDataWithRetry(String type) {                       │  │
-│  │          Supplier<RefDataResponse> supplier = () -> refDataClient.getRefData(type); │  │
+│  │      public RefDataResponse getRefDataWithRetry(String type) {                        │  │
+│  │          Supplier<RefDataResponse> supplier = () -> refDataClient.getRefData(type);   │  │
 │  │                                                                                       │  │
-│  │          // Wrap with retry                                                          │  │
-│  │          Supplier<RefDataResponse> retryingSupplier =                                │  │
-│  │              Retry.decorateSupplier(retry, supplier);                                │  │
+│  │          // Wrap with retry                                                           │  │
+│  │          Supplier<RefDataResponse> retryingSupplier =                                 │  │
+│  │              Retry.decorateSupplier(retry, supplier);                                 │  │
 │  │                                                                                       │  │
-│  │          try {                                                                       │  │
-│  │              return retryingSupplier.get();                                          │  │
-│  │          } catch (Exception e) {                                                     │  │
-│  │              // All retries exhausted                                                │  │
-│  │              throw new ServiceUnavailableException("RefData service unavailable", e);│  │
+│  │          try {                                                                        │  │
+│  │              return retryingSupplier.get();                                           │  │
+│  │          } catch (Exception e) {                                                      │  │
+│  │              // All retries exhausted                                                 │  │
+│  │              throw new ServiceUnavailableException("RefData service unavailable", e); │  │
 │  │          }                                                                            │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      private void handleRetryEvent(RetryOnRetryEvent event) {                        │  │
-│  │          // On retry, mark the failed instance as potentially unhealthy             │  │
-│  │          String lastAttemptedHost = getLastAttemptedHost();                          │  │
-│  │          instanceRegistry.markInstanceUnhealthy(                                     │  │
-│  │              "REFDATA-SERVICE",                                                      │  │
-│  │              lastAttemptedHost,                                                      │  │
-│  │              Duration.ofSeconds(30)  // Temporary unhealthy mark                     │  │
+│  │      private void handleRetryEvent(RetryOnRetryEvent event) {                         │  │
+│  │          // On retry, mark the failed instance as potentially unhealthy               │  │
+│  │          String lastAttemptedHost = getLastAttemptedHost();                           │  │
+│  │          instanceRegistry.markInstanceUnhealthy(                                      │  │
+│  │              "REFDATA-SERVICE",                                                       │  │
+│  │              lastAttemptedHost,                                                       │  │
+│  │              Duration.ofSeconds(30)  // Temporary unhealthy mark                      │  │
 │  │          );                                                                           │  │
 │  │                                                                                       │  │
-│  │          logger.warn("Retry attempt {} for RefData service. "                        │  │
-│  │              + "Marked {} as unhealthy. Reason: {}",                                 │  │
-│  │              event.getNumberOfRetryAttempts(),                                       │  │
-│  │              lastAttemptedHost,                                                      │  │
-│  │              event.getLastThrowable().getMessage());                                 │  │
+│  │          logger.warn("Retry attempt {} for RefData service. "                         │  │
+│  │              + "Marked {} as unhealthy. Reason: {}",                                  │  │
+│  │              event.getNumberOfRetryAttempts(),                                        │  │
+│  │              lastAttemptedHost,                                                       │  │
+│  │              event.getLastThrowable().getMessage());                                  │  │
 │  │      }                                                                                │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
@@ -996,53 +996,53 @@ How retry logic works with the service registry when calls fail.
 │  │  Custom Load Balancer - Instance Selection on Retry                                   │  │
 │  │  ──────────────────────────────────────────────────                                   │  │
 │  │                                                                                       │  │
-│  │  @Component                                                                          │  │
-│  │  public class LocalFirstLoadBalancer implements ReactorServiceInstanceLoadBalancer { │  │
+│  │  @Component                                                                           │  │
+│  │  public class LocalFirstLoadBalancer implements ReactorServiceInstanceLoadBalancer {  │  │
 │  │                                                                                       │  │
-│  │      private final ServiceInstanceRegistry registry;                                 │  │
-│  │      private final String currentServerId;                                           │  │
+│  │      private final ServiceInstanceRegistry registry;                                  │  │
+│  │      private final String currentServerId;                                            │  │
 │  │      private final AtomicReference<String> lastFailedInstance = new AtomicReference<>();
 │  │                                                                                       │  │
-│  │      @Override                                                                       │  │
-│  │      public Mono<Response<ServiceInstance>> choose(Request request) {                │  │
+│  │      @Override                                                                        │  │
+│  │      public Mono<Response<ServiceInstance>> choose(Request request) {                 │  │
 │  │                                                                                       │  │
-│  │          List<ServiceInstance> instances = registry.getHealthyInstances(serviceId); │  │
+│  │          List<ServiceInstance> instances = registry.getHealthyInstances(serviceId);   │  │
 │  │                                                                                       │  │
-│  │          if (instances.isEmpty()) {                                                  │  │
-│  │              return Mono.just(new EmptyResponse());                                  │  │
+│  │          if (instances.isEmpty()) {                                                   │  │
+│  │              return Mono.just(new EmptyResponse());                                   │  │
 │  │          }                                                                            │  │
 │  │                                                                                       │  │
-│  │          // Remove last failed instance from candidates (for retry)                  │  │
-│  │          String lastFailed = lastFailedInstance.get();                               │  │
-│  │          if (lastFailed != null) {                                                   │  │
-│  │              instances = instances.stream()                                          │  │
-│  │                  .filter(i -> !i.getInstanceId().equals(lastFailed))                 │  │
-│  │                  .collect(Collectors.toList());                                      │  │
+│  │          // Remove last failed instance from candidates (for retry)                   │  │
+│  │          String lastFailed = lastFailedInstance.get();                                │  │
+│  │          if (lastFailed != null) {                                                    │  │
+│  │              instances = instances.stream()                                           │  │
+│  │                  .filter(i -> !i.getInstanceId().equals(lastFailed))                  │  │
+│  │                  .collect(Collectors.toList());                                       │  │
 │  │          }                                                                            │  │
 │  │                                                                                       │  │
-│  │          // 1. Try local instance first                                              │  │
-│  │          Optional<ServiceInstance> local = instances.stream()                        │  │
-│  │              .filter(i -> i.getMetadata().get("server-id").equals(currentServerId)) │  │
-│  │              .findFirst();                                                           │  │
+│  │          // 1. Try local instance first                                               │  │
+│  │          Optional<ServiceInstance> local = instances.stream()                         │  │
+│  │              .filter(i -> i.getMetadata().get("server-id").equals(currentServerId))   │  │
+│  │              .findFirst();                                                            │  │
 │  │                                                                                       │  │
-│  │          if (local.isPresent()) {                                                    │  │
-│  │              return Mono.just(new DefaultResponse(local.get()));                     │  │
+│  │          if (local.isPresent()) {                                                     │  │
+│  │              return Mono.just(new DefaultResponse(local.get()));                      │  │
 │  │          }                                                                            │  │
 │  │                                                                                       │  │
-│  │          // 2. Select remote instance with lowest load                               │  │
-│  │          ServiceInstance selected = instances.stream()                               │  │
-│  │              .min(Comparator.comparing(i -> registry.getLoad(i)))                    │  │
-│  │              .orElse(instances.get(0));                                              │  │
+│  │          // 2. Select remote instance with lowest load                                │  │
+│  │          ServiceInstance selected = instances.stream()                                │  │
+│  │              .min(Comparator.comparing(i -> registry.getLoad(i)))                     │  │
+│  │              .orElse(instances.get(0));                                               │  │
 │  │                                                                                       │  │
-│  │          return Mono.just(new DefaultResponse(selected));                            │  │
+│  │          return Mono.just(new DefaultResponse(selected));                             │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      public void markLastFailed(String instanceId) {                                 │  │
-│  │          lastFailedInstance.set(instanceId);                                         │  │
+│  │      public void markLastFailed(String instanceId) {                                  │  │
+│  │          lastFailedInstance.set(instanceId);                                          │  │
 │  │      }                                                                                │  │
 │  │                                                                                       │  │
-│  │      public void clearLastFailed() {                                                 │  │
-│  │          lastFailedInstance.set(null);                                               │  │
+│  │      public void clearLastFailed() {                                                  │  │
+│  │          lastFailedInstance.set(null);                                                │  │
 │  │      }                                                                                │  │
 │  │  }                                                                                    │  │
 │  │                                                                                       │  │
@@ -1064,192 +1064,192 @@ Comprehensive flow showing all components working together.
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │                                                                                             │    │
-│  │   PHASE 1: STARTUP & REGISTRATION                                                          │    │
-│  │   ────────────────────────────────                                                         │    │
+│  │   PHASE 1: STARTUP & REGISTRATION                                                           │    │
+│  │   ────────────────────────────────                                                          │    │
 │  │                                                                                             │    │
-│  │   ┌───────────────┐          ┌───────────────┐          ┌───────────────┐                  │    │
-│  │   │ RefData       │          │ Eligibility   │          │ Eureka        │                  │    │
-│  │   │ Service       │          │ Service       │          │ Server        │                  │    │
-│  │   │ (server1)     │          │ (server1)     │          │ (server1)     │                  │    │
-│  │   └───────┬───────┘          └───────┬───────┘          └───────┬───────┘                  │    │
-│  │           │                          │                          │                          │    │
-│  │           │ 1. Register              │ 2. Register              │                          │    │
-│  │           │─────────────────────────────────────────────────────►                          │    │
-│  │           │                          │─────────────────────────►│                          │    │
-│  │           │                          │                          │                          │    │
-│  │           │ 3. Heartbeats (every 30s)│                          │                          │    │
-│  │           │─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─►│                          │    │
-│  │           │                          │─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ►│                          │    │
-│  │                                                                                             │    │
-│  └─────────────────────────────────────────────────────────────────────────────────────────────┘    │
-│                                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐    │
-│  │                                                                                             │    │
-│  │   PHASE 2: SERVICE CALL (Happy Path - Local Instance Available)                            │    │
-│  │   ─────────────────────────────────────────────────────────────                            │    │
-│  │                                                                                             │    │
-│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐         │    │
-│  │   │ Client        │    │ Ingestion     │    │ LocalFirst    │    │ RefData       │         │    │
-│  │   │ Request       │    │ Service       │    │ LoadBalancer  │    │ Service       │         │    │
-│  │   │               │    │ (server1)     │    │               │    │ (server1)     │         │    │
-│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘    └───────┬───────┘         │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │ 1. POST /ingest    │                    │                    │                 │    │
-│  │           │───────────────────►│                    │                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 2. getRefData()    │                    │                 │    │
-│  │           │                    │───────────────────►│                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 3. Get instances   │                 │    │
-│  │           │                    │                    │    from local cache│                 │    │
-│  │           │                    │                    │    [server1, server3]               │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 4. Select LOCAL    │                 │    │
-│  │           │                    │                    │    (server1:8081)  │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 5. HTTP GET        │                 │    │
-│  │           │                    │                    │───────────────────►│                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 6. Response        │                 │    │
-│  │           │                    │                    │◄───────────────────│                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 7. RefData Response│                    │                 │    │
-│  │           │                    │◄───────────────────│                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │ 8. Ingest Response │                    │                    │                 │    │
-│  │           │◄───────────────────│                    │                    │                 │    │
+│  │   ┌───────────────┐          ┌───────────────┐          ┌───────────────┐                   │    │
+│  │   │ RefData       │          │ Eligibility   │          │ Eureka        │                   │    │
+│  │   │ Service       │          │ Service       │          │ Server        │                   │    │
+│  │   │ (server1)     │          │ (server1)     │          │ (server1)     │                   │    │
+│  │   └───────┬───────┘          └───────┬───────┘          └───────┬───────┘                   │    │
+│  │           │                          │                          │                           │    │
+│  │           │ 1. Register              │ 2. Register              │                           │    │
+│  │           │─────────────────────────────────────────────────────►                           │    │
+│  │           │                          │─────────────────────────►│                           │    │
+│  │           │                          │                          │                           │    │
+│  │           │ 3. Heartbeats (every 30s)│                          │                           │    │
+│  │           │─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─►│                            │    │
+│  │           │                          │─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ►│                            │    │
 │  │                                                                                             │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │                                                                                             │    │
-│  │   PHASE 3: SERVICE CALL WITH RETRY (Local Instance Fails)                                  │    │
-│  │   ───────────────────────────────────────────────────────                                  │    │
+│  │   PHASE 2: SERVICE CALL (Happy Path - Local Instance Available)                             │    │
+│  │   ─────────────────────────────────────────────────────────────                             │    │
 │  │                                                                                             │    │
-│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐         │    │
-│  │   │ Ingestion     │    │ Resilience4j  │    │ LocalFirst    │    │ RefData       │         │    │
-│  │   │ Service       │    │ Retry         │    │ LoadBalancer  │    │ Services      │         │    │
-│  │   │ (server1)     │    │               │    │               │    │               │         │    │
-│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘    └───────┬───────┘         │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │ 1. getRefData()    │                    │                    │                 │    │
-│  │           │───────────────────►│                    │                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 2. Execute         │                    │                 │    │
-│  │           │                    │    (Attempt 1)     │                    │                 │    │
-│  │           │                    │───────────────────►│                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 3. Select LOCAL    │                 │    │
-│  │           │                    │                    │    server1:8081    │                 │    │
-│  │           │                    │                    │───────────────────►│ (server1)       │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 4. TIMEOUT!        │                 │    │
-│  │           │                    │                    │◄ ─ ─ ─ ─ ─ ─ ─ ─ ─ │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 5. Catch exception │                    │                 │    │
-│  │           │                    │    Mark server1    │                    │                 │    │
-│  │           │                    │    as unhealthy    │                    │                 │    │
-│  │           │                    │◄───────────────────│                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 6. Wait 500ms      │                    │                 │    │
-│  │           │                    │    (exponential    │                    │                 │    │
-│  │           │                    │     backoff)       │                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 7. Execute         │                    │                 │    │
-│  │           │                    │    (Attempt 2)     │                    │                 │    │
-│  │           │                    │───────────────────►│                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 8. Select REMOTE   │                 │    │
-│  │           │                    │                    │    server3:8081    │                 │    │
-│  │           │                    │                    │    (server1 marked │                 │    │
-│  │           │                    │                    │     unhealthy)     │                 │    │
-│  │           │                    │                    │───────────────────►│ (server3)       │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │                    │ 9. SUCCESS (200)   │                 │    │
-│  │           │                    │                    │◄───────────────────│                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │                    │ 10. Clear retry    │                    │                 │    │
-│  │           │                    │     state          │                    │                 │    │
-│  │           │                    │◄───────────────────│                    │                 │    │
-│  │           │                    │                    │                    │                 │    │
-│  │           │ 11. Response       │                    │                    │                 │    │
-│  │           │◄───────────────────│                    │                    │                 │    │
+│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐          │    │
+│  │   │ Client        │    │ Ingestion     │    │ LocalFirst    │    │ RefData       │          │    │
+│  │   │ Request       │    │ Service       │    │ LoadBalancer  │    │ Service       │          │    │
+│  │   │               │    │ (server1)     │    │               │    │ (server1)     │          │    │
+│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘    └───────┬───────┘          │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │ 1. POST /ingest    │                    │                    │                  │    │
+│  │           │───────────────────►│                    │                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 2. getRefData()    │                    │                  │    │
+│  │           │                    │───────────────────►│                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 3. Get instances   │                  │    │
+│  │           │                    │                    │    from local cache│                  │    │
+│  │           │                    │                    │    [server1, server3]                 │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 4. Select LOCAL    │                  │    │
+│  │           │                    │                    │    (server1:8081)  │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 5. HTTP GET        │                  │    │
+│  │           │                    │                    │───────────────────►│                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 6. Response        │                  │    │
+│  │           │                    │                    │◄───────────────────│                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 7. RefData Response│                    │                  │    │
+│  │           │                    │◄───────────────────│                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │ 8. Ingest Response │                    │                    │                  │    │
+│  │           │◄───────────────────│                    │                    │                  │    │
 │  │                                                                                             │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │                                                                                             │    │
-│  │   PHASE 4: BACKGROUND HEALTH RECOVERY                                                      │    │
-│  │   ───────────────────────────────────                                                      │    │
+│  │   PHASE 3: SERVICE CALL WITH RETRY (Local Instance Fails)                                   │    │
+│  │   ───────────────────────────────────────────────────────                                   │    │
 │  │                                                                                             │    │
-│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐                              │    │
-│  │   │ Health        │    │ Service       │    │ RefData       │                              │    │
-│  │   │ Monitor       │    │ Instance      │    │ Service       │                              │    │
-│  │   │ (Executor)    │    │ Registry      │    │ (server1)     │                              │    │
-│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘                              │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 1. Scheduled check │                    │                                      │    │
-│  │           │    (every 10s)     │                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 2. GET /actuator/health                 │                                      │    │
-│  │           │─────────────────────────────────────────►                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 3. { "status": "UP" }                   │                                      │    │
-│  │           │◄─────────────────────────────────────────                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 4. Update registry │                    │                                      │    │
-│  │           │───────────────────►│                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │ 5. Mark server1    │                                      │    │
-│  │           │                    │    as HEALTHY      │                                      │    │
-│  │           │                    │    again           │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │   ───── Future calls can now use server1 (LOCAL) again ─────                              │    │
+│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐          │    │
+│  │   │ Ingestion     │    │ Resilience4j  │    │ LocalFirst    │    │ RefData       │          │    │
+│  │   │ Service       │    │ Retry         │    │ LoadBalancer  │    │ Services      │          │    │
+│  │   │ (server1)     │    │               │    │               │    │               │          │    │
+│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘    └───────┬───────┘          │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │ 1. getRefData()    │                    │                    │                  │    │
+│  │           │───────────────────►│                    │                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 2. Execute         │                    │                  │    │
+│  │           │                    │    (Attempt 1)     │                    │                  │    │
+│  │           │                    │───────────────────►│                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 3. Select LOCAL    │                  │    │
+│  │           │                    │                    │    server1:8081    │                  │    │
+│  │           │                    │                    │───────────────────►│ (server1)        │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 4. TIMEOUT!        │                  │    │
+│  │           │                    │                    │◄ ─ ─ ─ ─ ─ ─ ─ ─ ─ │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 5. Catch exception │                    │                  │    │
+│  │           │                    │    Mark server1    │                    │                  │    │
+│  │           │                    │    as unhealthy    │                    │                  │    │
+│  │           │                    │◄───────────────────│                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 6. Wait 500ms      │                    │                  │    │
+│  │           │                    │    (exponential    │                    │                  │    │
+│  │           │                    │     backoff)       │                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 7. Execute         │                    │                  │    │
+│  │           │                    │    (Attempt 2)     │                    │                  │    │
+│  │           │                    │───────────────────►│                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 8. Select REMOTE   │                  │    │
+│  │           │                    │                    │    server3:8081    │                  │    │
+│  │           │                    │                    │    (server1 marked │                  │    │
+│  │           │                    │                    │     unhealthy)     │                  │    │
+│  │           │                    │                    │───────────────────►│ (server3)        │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │                    │ 9. SUCCESS (200)   │                  │    │
+│  │           │                    │                    │◄───────────────────│                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │                    │ 10. Clear retry    │                    │                  │    │
+│  │           │                    │     state          │                    │                  │    │
+│  │           │                    │◄───────────────────│                    │                  │    │
+│  │           │                    │                    │                    │                  │    │
+│  │           │ 11. Response       │                    │                    │                  │    │
+│  │           │◄───────────────────│                    │                    │                  │    │
 │  │                                                                                             │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐    │
 │  │                                                                                             │    │
-│  │   PHASE 5: GRACEFUL SHUTDOWN & DEREGISTRATION                                              │    │
-│  │   ───────────────────────────────────────────                                              │    │
+│  │   PHASE 4: BACKGROUND HEALTH RECOVERY                                                       │    │
+│  │   ───────────────────────────────────                                                       │    │
 │  │                                                                                             │    │
-│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐                              │    │
-│  │   │ RefData       │    │ Eureka        │    │ Ingestion     │                              │    │
-│  │   │ Service       │    │ Server        │    │ Service       │                              │    │
-│  │   │ (server1)     │    │               │    │ (Local Cache) │                              │    │
-│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘                              │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 1. SIGTERM         │                    │                                      │    │
-│  │           │    received        │                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 2. DELETE /eureka/apps/REFDATA-SERVICE/server1:refdata:8081                   │    │
-│  │           │───────────────────►│                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │ 3. Remove from     │                                      │    │
-│  │           │                    │    registry        │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │ 4. Invalidate      │                                      │    │
-│  │           │                    │    cache           │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 5. 200 OK          │                    │                                      │    │
-│  │           │◄───────────────────│                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │ 6. Shutdown        │                    │                                      │    │
-│  │           │    complete        │                    │                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │ 7. Delta fetch     │                                      │    │
-│  │           │                    │    (next 30s)      │                                      │    │
-│  │           │                    │◄───────────────────│                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │ 8. Delta includes  │                                      │    │
-│  │           │                    │    DELETED action  │                                      │    │
-│  │           │                    │───────────────────►│                                      │    │
-│  │           │                    │                    │                                      │    │
-│  │           │                    │                    │ 9. Remove server1                    │    │
-│  │           │                    │                    │    from local cache                  │    │
-│  │           │                    │                    │                                      │    │
-│  │   ───── Future calls will only go to server3 (REMOTE) ─────                               │    │
+│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐                               │    │
+│  │   │ Health        │    │ Service       │    │ RefData       │                               │    │
+│  │   │ Monitor       │    │ Instance      │    │ Service       │                               │    │
+│  │   │ (Executor)    │    │ Registry      │    │ (server1)     │                               │    │
+│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘                               │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 1. Scheduled check │                    │                                       │    │
+│  │           │    (every 10s)     │                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 2. GET /actuator/health                 │                                       │    │
+│  │           │─────────────────────────────────────────►                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 3. { "status": "UP" }                   │                                       │    │
+│  │           │◄─────────────────────────────────────────                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 4. Update registry │                    │                                       │    │
+│  │           │───────────────────►│                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │ 5. Mark server1    │                                       │    │
+│  │           │                    │    as HEALTHY      │                                       │    │
+│  │           │                    │    again           │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │   ───── Future calls can now use server1 (LOCAL) again ─────                                │    │
+│  │                                                                                             │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                                             │    │
+│  │   PHASE 5: GRACEFUL SHUTDOWN & DEREGISTRATION                                               │    │
+│  │   ───────────────────────────────────────────                                               │    │
+│  │                                                                                             │    │
+│  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐                               │    │
+│  │   │ RefData       │    │ Eureka        │    │ Ingestion     │                               │    │
+│  │   │ Service       │    │ Server        │    │ Service       │                               │    │
+│  │   │ (server1)     │    │               │    │ (Local Cache) │                               │    │
+│  │   └───────┬───────┘    └───────┬───────┘    └───────┬───────┘                               │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 1. SIGTERM         │                    │                                       │    │
+│  │           │    received        │                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 2. DELETE /eureka/apps/REFDATA-SERVICE/server1:refdata:8081                     │    │
+│  │           │───────────────────►│                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │ 3. Remove from     │                                       │    │
+│  │           │                    │    registry        │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │ 4. Invalidate      │                                       │    │
+│  │           │                    │    cache           │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 5. 200 OK          │                    │                                       │    │
+│  │           │◄───────────────────│                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │ 6. Shutdown        │                    │                                       │    │
+│  │           │    complete        │                    │                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │ 7. Delta fetch     │                                       │    │
+│  │           │                    │    (next 30s)      │                                       │    │
+│  │           │                    │◄───────────────────│                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │ 8. Delta includes  │                                       │    │
+│  │           │                    │    DELETED action  │                                       │    │
+│  │           │                    │───────────────────►│                                       │    │
+│  │           │                    │                    │                                       │    │
+│  │           │                    │                    │ 9. Remove server1                     │    │
+│  │           │                    │                    │    from local cache                   │    │
+│  │           │                    │                    │                                       │    │
+│  │   ───── Future calls will only go to server3 (REMOTE) ─────                                 │    │
 │  │                                                                                             │    │
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                                     │
