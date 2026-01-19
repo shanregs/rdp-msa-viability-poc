@@ -1,10 +1,6 @@
 package com.bmo.rdp.tradereceiver.service;
 
 import com.bmo.rdp.common.dto.*;
-import com.bmo.rdp.tradereceiver.client.CheckEligibleClient;
-import com.bmo.rdp.tradereceiver.client.ReferenceLookupClient;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,15 +12,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for processing incoming trades.
- * Calls Reference Lookup and Check Eligible services with local-first load balancing.
+ * Uses ResilientServiceClient for calls to Reference Lookup and Check Eligible services
+ * with retry and circuit breaker support.
  */
 @Service
 public class TradeReceiverService {
 
     private static final Logger log = LoggerFactory.getLogger(TradeReceiverService.class);
 
-    private final ReferenceLookupClient referenceLookupClient;
-    private final CheckEligibleClient checkEligibleClient;
+    private final ResilientServiceClient resilientServiceClient;
 
     // Cache of processed trades
     private final Map<String, TradeResponse> tradeCache = new ConcurrentHashMap<>();
@@ -35,24 +31,27 @@ public class TradeReceiverService {
     @Value("${spring.profiles.active:default}")
     private String profile;
 
-    public TradeReceiverService(ReferenceLookupClient referenceLookupClient,
-                                CheckEligibleClient checkEligibleClient) {
-        this.referenceLookupClient = referenceLookupClient;
-        this.checkEligibleClient = checkEligibleClient;
+    public TradeReceiverService(ResilientServiceClient resilientServiceClient) {
+        this.resilientServiceClient = resilientServiceClient;
     }
 
-    @CircuitBreaker(name = "tradeProcessing", fallbackMethod = "processTradesFallback")
-    @Retry(name = "tradeProcessing")
+    /**
+     * Process a trade request.
+     *
+     * The ResilientServiceClient handles retry and circuit breaker logic.
+     * If all retries fail, the circuit breaker fallback returns a safe response.
+     */
     public TradeResponse processTrade(TradeRequest request) {
         log.info("Processing trade: {} on {}/{}", request.tradeId(), serverId, profile);
 
         try {
-            // Step 1: Get reference data for the instrument
-            ReferenceData refData = getInstrumentData(request.instrument());
+            // Step 1: Get reference data for the instrument (with retry/circuit breaker)
+            log.debug("Calling reference lookup for instrument: {}", request.instrument());
+            ReferenceData refData = resilientServiceClient.getInstrumentData(request.instrument());
             log.debug("Got reference data for {}: {}", request.instrument(),
                     refData != null ? refData.serverId() : "null");
 
-            // Step 2: Check eligibility
+            // Step 2: Check eligibility (with retry/circuit breaker)
             EligibilityRequest eligibilityRequest = new EligibilityRequest(
                     request.tradeId(),
                     request.tradeType(),
@@ -60,7 +59,8 @@ public class TradeReceiverService {
                     request.quantity().multiply(request.price()),
                     request.currency()
             );
-            EligibilityResponse eligibility = checkEligibility(eligibilityRequest);
+            log.debug("Calling eligibility check for trade: {}", request.tradeId());
+            EligibilityResponse eligibility = resilientServiceClient.checkEligibility(eligibilityRequest);
             log.debug("Eligibility check for {}: {} (from {})",
                     request.tradeId(), eligibility.eligible(), eligibility.serverId());
 
@@ -77,10 +77,12 @@ public class TradeReceiverService {
             return response;
 
         } catch (Exception e) {
-            log.error("Error processing trade {}: {}", request.tradeId(), e.getMessage(), e);
+            // This catch block handles unexpected errors not handled by Resilience4j
+            // Circuit breaker fallbacks should prevent most exceptions from reaching here
+            log.error("Unexpected error processing trade {}: {}", request.tradeId(), e.getMessage(), e);
             TradeResponse errorResponse = TradeResponse.error(
                     request.tradeId(),
-                    "Error processing trade: " + e.getMessage(),
+                    "Unexpected error: " + e.getMessage(),
                     serverId,
                     profile
             );
@@ -89,48 +91,7 @@ public class TradeReceiverService {
         }
     }
 
-    @CircuitBreaker(name = "referenceLookup", fallbackMethod = "getInstrumentDataFallback")
-    @Retry(name = "referenceLookup")
-    private ReferenceData getInstrumentData(String instrument) {
-        log.debug("Calling reference lookup for instrument: {}", instrument);
-        return referenceLookupClient.getInstrumentData(instrument);
-    }
-
-    @CircuitBreaker(name = "checkEligible", fallbackMethod = "checkEligibilityFallback")
-    @Retry(name = "checkEligible")
-    private EligibilityResponse checkEligibility(EligibilityRequest request) {
-        log.debug("Calling eligibility check for trade: {}", request.tradeId());
-        return checkEligibleClient.checkEligibility(request);
-    }
-
     public Optional<TradeResponse> getTradeStatus(String tradeId) {
         return Optional.ofNullable(tradeCache.get(tradeId));
-    }
-
-    // Fallback methods
-
-    private TradeResponse processTradesFallback(TradeRequest request, Throwable t) {
-        log.warn("Fallback triggered for trade processing: {} - {}", request.tradeId(), t.getMessage());
-        return TradeResponse.error(
-                request.tradeId(),
-                "Service temporarily unavailable. Please retry later.",
-                serverId,
-                profile
-        );
-    }
-
-    private ReferenceData getInstrumentDataFallback(String instrument, Throwable t) {
-        log.warn("Fallback triggered for reference lookup: {} - {}", instrument, t.getMessage());
-        return ReferenceData.of("FALLBACK", "INSTRUMENT", instrument, "Fallback data", serverId);
-    }
-
-    private EligibilityResponse checkEligibilityFallback(EligibilityRequest request, Throwable t) {
-        log.warn("Fallback triggered for eligibility check: {} - {}", request.tradeId(), t.getMessage());
-        // In fallback, we reject the trade for safety
-        return EligibilityResponse.ineligible(
-                request.tradeId(),
-                java.util.List.of("Eligibility service unavailable - trade rejected for safety"),
-                serverId
-        );
     }
 }

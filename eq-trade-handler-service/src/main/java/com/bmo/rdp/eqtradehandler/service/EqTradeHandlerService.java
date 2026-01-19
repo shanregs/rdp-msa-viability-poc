@@ -3,12 +3,8 @@ package com.bmo.rdp.eqtradehandler.service;
 import com.bmo.rdp.common.dto.EligibilityRequest;
 import com.bmo.rdp.common.dto.EligibilityResponse;
 import com.bmo.rdp.common.dto.ReferenceData;
-import com.bmo.rdp.eqtradehandler.client.CheckEligibleClient;
-import com.bmo.rdp.eqtradehandler.client.ReferenceLookupClient;
 import com.bmo.rdp.eqtradehandler.dto.RegulatoryRequest;
 import com.bmo.rdp.eqtradehandler.dto.RegulatoryResponse;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,14 +16,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for regulatory processing of equity trades.
+ * Uses ResilientServiceClient for calls to Reference Lookup and Check Eligible services
+ * with retry and circuit breaker support.
  */
 @Service
 public class EqTradeHandlerService {
 
     private static final Logger log = LoggerFactory.getLogger(EqTradeHandlerService.class);
 
-    private final ReferenceLookupClient referenceLookupClient;
-    private final CheckEligibleClient checkEligibleClient;
+    private final ResilientServiceClient resilientServiceClient;
 
     // Cache of processed regulatory requests
     private final Map<String, RegulatoryResponse> processingCache = new ConcurrentHashMap<>();
@@ -39,26 +36,29 @@ public class EqTradeHandlerService {
     @Value("${server.id:unknown}")
     private String serverId;
 
-    public EqTradeHandlerService(ReferenceLookupClient referenceLookupClient,
-                                 CheckEligibleClient checkEligibleClient) {
-        this.referenceLookupClient = referenceLookupClient;
-        this.checkEligibleClient = checkEligibleClient;
+    public EqTradeHandlerService(ResilientServiceClient resilientServiceClient) {
+        this.resilientServiceClient = resilientServiceClient;
     }
 
-    @CircuitBreaker(name = "regulatoryProcessing", fallbackMethod = "processRegulatoryFallback")
-    @Retry(name = "regulatoryProcessing")
+    /**
+     * Process a regulatory request.
+     *
+     * The ResilientServiceClient handles retry and circuit breaker logic for downstream calls.
+     * If all retries fail, the circuit breaker fallback returns a safe response.
+     */
     public RegulatoryResponse processRegulatory(RegulatoryRequest request) {
         log.info("Processing regulatory request for trade: {} on {}", request.tradeId(), serverId);
 
         try {
             List<String> findings = new ArrayList<>();
 
-            // Step 1: Get reference data
-            ReferenceData refData = getInstrumentData(request.instrument());
+            // Step 1: Get reference data (with retry/circuit breaker)
+            log.debug("Calling reference lookup for instrument: {}", request.instrument());
+            ReferenceData refData = resilientServiceClient.getInstrumentData(request.instrument());
             log.debug("Got reference data for {}: {}", request.instrument(),
                     refData != null ? refData.serverId() : "null");
 
-            // Step 2: Check eligibility
+            // Step 2: Check eligibility (with retry/circuit breaker)
             EligibilityRequest eligibilityRequest = new EligibilityRequest(
                     request.tradeId(),
                     request.tradeType(),
@@ -66,7 +66,8 @@ public class EqTradeHandlerService {
                     request.quantity().multiply(request.price()),
                     request.currency()
             );
-            EligibilityResponse eligibility = checkEligibility(eligibilityRequest);
+            log.debug("Calling eligibility check for trade: {}", request.tradeId());
+            EligibilityResponse eligibility = resilientServiceClient.checkEligibility(eligibilityRequest);
             log.debug("Eligibility check for {}: {} (from {})",
                     request.tradeId(), eligibility.eligible(), eligibility.serverId());
 
@@ -120,10 +121,12 @@ public class EqTradeHandlerService {
             return response;
 
         } catch (Exception e) {
-            log.error("Error processing regulatory request {}: {}", request.tradeId(), e.getMessage(), e);
+            // This catch block handles unexpected errors not handled by Resilience4j
+            // Circuit breaker fallbacks should prevent most exceptions from reaching here
+            log.error("Unexpected error processing regulatory request {}: {}", request.tradeId(), e.getMessage(), e);
             RegulatoryResponse errorResponse = RegulatoryResponse.error(
                     request.tradeId(),
-                    "Error processing regulatory request: " + e.getMessage(),
+                    "Unexpected error: " + e.getMessage(),
                     serverId
             );
             processingCache.put(request.tradeId(), errorResponse);
@@ -131,46 +134,7 @@ public class EqTradeHandlerService {
         }
     }
 
-    @CircuitBreaker(name = "referenceLookup", fallbackMethod = "getInstrumentDataFallback")
-    @Retry(name = "referenceLookup")
-    private ReferenceData getInstrumentData(String instrument) {
-        log.debug("Calling reference lookup for instrument: {}", instrument);
-        return referenceLookupClient.getInstrumentData(instrument);
-    }
-
-    @CircuitBreaker(name = "checkEligible", fallbackMethod = "checkEligibilityFallback")
-    @Retry(name = "checkEligible")
-    private EligibilityResponse checkEligibility(EligibilityRequest request) {
-        log.debug("Calling eligibility check for trade: {}", request.tradeId());
-        return checkEligibleClient.checkEligibility(request);
-    }
-
     public Optional<RegulatoryResponse> getProcessingStatus(String tradeId) {
         return Optional.ofNullable(processingCache.get(tradeId));
-    }
-
-    // Fallback methods
-
-    private RegulatoryResponse processRegulatoryFallback(RegulatoryRequest request, Throwable t) {
-        log.warn("Fallback triggered for regulatory processing: {} - {}", request.tradeId(), t.getMessage());
-        return RegulatoryResponse.error(
-                request.tradeId(),
-                "Service temporarily unavailable. Please retry later.",
-                serverId
-        );
-    }
-
-    private ReferenceData getInstrumentDataFallback(String instrument, Throwable t) {
-        log.warn("Fallback triggered for reference lookup: {} - {}", instrument, t.getMessage());
-        return ReferenceData.of("FALLBACK", "INSTRUMENT", instrument, "Fallback data", serverId);
-    }
-
-    private EligibilityResponse checkEligibilityFallback(EligibilityRequest request, Throwable t) {
-        log.warn("Fallback triggered for eligibility check: {} - {}", request.tradeId(), t.getMessage());
-        return EligibilityResponse.ineligible(
-                request.tradeId(),
-                List.of("Eligibility service unavailable - trade rejected for safety"),
-                serverId
-        );
     }
 }
