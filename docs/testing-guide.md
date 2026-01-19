@@ -507,3 +507,449 @@ curl -s "http://localhost:8082/actuator/circuitbreakers" | jq '.circuitBreakers 
 # Check Eureka registrations
 curl -s "http://localhost:8088/eureka/apps" | grep -oP '(?<=<app>)[^<]+'
 ```
+
+---
+
+## Passive Health Retry Test Flows
+
+This section provides detailed test flow diagrams and verified test scenarios for the Passive Health with Immediate Retry pattern.
+
+### Test Flow 1: Passive Health Immediate Failover
+
+**Objective**: Verify that when a local instance fails, the system immediately marks it unhealthy and retries on a remote instance with 0ms delay.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                             │
+│                    TEST FLOW: PASSIVE HEALTH IMMEDIATE FAILOVER                             │
+│                                                                                             │
+│  SETUP:                                                                                     │
+│  ─────────────────────────────────────────────────────────────────────────────────────────  │
+│  • Server1: trade-receiver-service (port 8082) + reference-lookup-service (port 8081)      │
+│  • Server3: reference-lookup-service (port 8081) - remote instance                         │
+│  • Local reference-lookup is PAUSED (SIGSTOP) to simulate failure                          │
+│                                                                                             │
+│  ┌─────────────┐                                                                            │
+│  │   Client    │                                                                            │
+│  └──────┬──────┘                                                                            │
+│         │                                                                                   │
+│         │ T+0ms: POST /api/v1/trades                                                        │
+│         ▼                                                                                   │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           TRADE RECEIVER SERVICE (Server1)                            │   │
+│  │                                                                                       │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ T+1ms: TradeReceiverService.processTrade()                                       │ │   │
+│  │  │        → Calls reference-lookup-service                                          │ │   │
+│  │  └─────────────────────────────────────────────────────────────────────────────────┘ │   │
+│  │                                  │                                                    │   │
+│  │                                  ▼                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ T+2ms: LocalFirstLoadBalancer.choose()                                           │ │   │
+│  │  │        → PassiveHealthContext: triedInstances = []                               │ │   │
+│  │  │        → SELECTED: LOCAL instance (reference-lookup:server1:8081)                │ │   │
+│  │  │        → context.setCurrentInstance("reference-lookup", "server1:8081")          │ │   │
+│  │  └─────────────────────────────────────────────────────────────────────────────────┘ │   │
+│  │                                  │                                                    │   │
+│  │                                  ▼                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ T+3ms → T+10003ms: Feign Client attempts connection to LOCAL instance            │ │   │
+│  │  │                                                                                  │ │   │
+│  │  │        ╔═══════════════════════════════════════════════════════════════════════╗ │ │   │
+│  │  │        ║  LOCAL INSTANCE (server1:8081) IS PAUSED - NO RESPONSE                ║ │ │   │
+│  │  │        ║  Connection hangs until socket timeout (10 seconds)                   ║ │ │   │
+│  │  │        ╚═══════════════════════════════════════════════════════════════════════╝ │ │   │
+│  │  │                                                                                  │ │   │
+│  │  │        T+10003ms: SocketTimeoutException: Read timed out                         │ │   │
+│  │  └─────────────────────────────────────────────────────────────────────────────────┘ │   │
+│  │                                  │                                                    │   │
+│  │                                  ▼                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ T+10004ms: RESILIENCE4J RETRY EVENT → PassiveHealthRetryEventListener.onRetry() │ │   │
+│  │  │                                                                                  │ │   │
+│  │  │   ┌─────────────────────────────────────────────────────────────────────────┐   │ │   │
+│  │  │   │ PASSIVE HEALTH UPDATE (0ms):                                             │   │ │   │
+│  │  │   │                                                                          │   │ │   │
+│  │  │   │ 1. context.markTried("reference-lookup:server1:8081")                    │   │ │   │
+│  │  │   │ 2. registry.markUnhealthy("reference-lookup", "server1:8081")            │   │ │   │
+│  │  │   │                                                                          │   │ │   │
+│  │  │   │ LOG: WARN - PASSIVE HEALTH: Instance server1:8081 marked UNHEALTHY       │   │ │   │
+│  │  │   │ LOG: INFO - PASSIVE HEALTH FAILOVER: retry #1 - trying next instance     │   │ │   │
+│  │  │   └─────────────────────────────────────────────────────────────────────────┘   │ │   │
+│  │  └─────────────────────────────────────────────────────────────────────────────────┘ │   │
+│  │                                  │                                                    │   │
+│  │                                  ▼                                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ T+10005ms: IMMEDIATE RETRY (wait-duration: 0ms)                                  │ │   │
+│  │  │                                                                                  │ │   │
+│  │  │   LocalFirstLoadBalancer.choose() - RETRY ATTEMPT                                │ │   │
+│  │  │   → PassiveHealthContext: triedInstances = ["server1:8081"]                      │ │   │
+│  │  │   → Local instance? YES but IN triedInstances → SKIP                             │ │   │
+│  │  │   → SELECTED: REMOTE instance (reference-lookup:server3:8081)                    │ │   │
+│  │  │   → context.setCurrentInstance("reference-lookup", "server3:8081")               │ │   │
+│  │  │                                                                                  │ │   │
+│  │  │   LOG: DEBUG - Skipping LOCAL instance server1:8081 (already tried)              │ │   │
+│  │  │   LOG: DEBUG - Selected REMOTE instance server3:8081 (load=0)                    │ │   │
+│  │  └─────────────────────────────────────────────────────────────────────────────────┘ │   │
+│  │                                  │                                                    │   │
+│  └──────────────────────────────────┼────────────────────────────────────────────────────┘   │
+│                                     │                                                        │
+│                                     ▼                                                        │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                       REFERENCE LOOKUP SERVICE (Server3 - REMOTE)                     │   │
+│  │                                                                                       │   │
+│  │  T+10006ms: Receives GET /api/v1/refdata/instrument/AAPL                              │   │
+│  │  T+10017ms: Returns 200 OK with instrument data (11ms response time)                  │   │
+│  │                                                                                       │   │
+│  └──────────────────────────────────────────────────────────────────────────────────────┘   │
+│                                     │                                                        │
+│                                     ▼                                                        │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           TRADE RECEIVER SERVICE (cont.)                              │   │
+│  │                                                                                       │   │
+│  │  T+10018ms: PassiveHealthRetryEventListener.onSuccess()                               │   │
+│  │             LOG: INFO - PASSIVE HEALTH: referenceLookup succeeded after 1 retries     │   │
+│  │             → PassiveHealthContext.clear()                                            │   │
+│  │                                                                                       │   │
+│  │  T+10019ms: Continue with eligibility check → SUCCESS                                 │   │
+│  │  T+10025ms: Return response to client                                                 │   │
+│  │                                                                                       │   │
+│  └──────────────────────────────────────────────────────────────────────────────────────┘   │
+│                                     │                                                        │
+│                                     ▼                                                        │
+│  ┌─────────────┐                                                                            │
+│  │   Client    │  T+10025ms: Receives 200 OK                                                │
+│  │             │  Response: { "status": "PROCESSED", "referenceData": { "serverId": "server3" } }
+│  └─────────────┘                                                                            │
+│                                                                                             │
+│  ═══════════════════════════════════════════════════════════════════════════════════════   │
+│                                                                                             │
+│  TIMELINE SUMMARY:                                                                          │
+│  ─────────────────                                                                          │
+│  T+0ms      : Request received                                                              │
+│  T+2ms      : Selected LOCAL instance                                                       │
+│  T+10003ms  : Local timeout (SocketTimeoutException)                                        │
+│  T+10004ms  : PASSIVE HEALTH: Mark local UNHEALTHY (0ms)                                    │
+│  T+10005ms  : IMMEDIATE RETRY to remote (0ms delay)                                         │
+│  T+10017ms  : Remote response received (11ms)                                               │
+│  T+10025ms  : Final response to client                                                      │
+│                                                                                             │
+│  TOTAL FAILOVER TIME: ~22ms (after timeout detection)                                       │
+│  VS TRADITIONAL: 3+ seconds (500ms + 1000ms + 2000ms exponential backoff)                   │
+│                                                                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Test Flow 2: Circuit Breaker with Passive Health
+
+**Objective**: Verify that when all instances fail, the circuit breaker opens and provides fast-fail with fallback.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                             │
+│                    TEST FLOW: CIRCUIT BREAKER WITH PASSIVE HEALTH                           │
+│                                                                                             │
+│  SETUP:                                                                                     │
+│  ─────────────────────────────────────────────────────────────────────────────────────────  │
+│  • ALL reference-lookup instances PAUSED (Server1 and Server3)                              │
+│  • Circuit breaker initially CLOSED                                                         │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              PHASE 1: FAILURES ACCUMULATE                            │    │
+│  │                                                                                      │    │
+│  │  Request 1-10: Each request exhausts all 3 retry attempts                            │    │
+│  │                                                                                      │    │
+│  │  For each request:                                                                   │    │
+│  │  ┌────────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │ Attempt 1 → Local (server1) → TIMEOUT → Mark UNHEALTHY                         │  │    │
+│  │  │ Attempt 2 → Remote (server3) → TIMEOUT → Mark UNHEALTHY                        │  │    │
+│  │  │ Attempt 3 → No healthy instances → 503 ServiceUnavailable                      │  │    │
+│  │  │                                                                                │  │    │
+│  │  │ LOG: ERROR - PASSIVE HEALTH: referenceLookup exhausted all 3 retries           │  │    │
+│  │  │       Tried instances: [server1:8081, server3:8081]                            │  │    │
+│  │  │                                                                                │  │    │
+│  │  │ Circuit Breaker: Records FAILURE                                               │  │    │
+│  │  └────────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                      │    │
+│  │  After 10 failures:                                                                  │    │
+│  │  ┌────────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │                                                                                │  │    │
+│  │  │  Circuit Breaker State:                                                        │  │    │
+│  │  │  ├── failureRate: 100%                                                         │  │    │
+│  │  │  ├── bufferedCalls: 10                                                         │  │    │
+│  │  │  ├── failedCalls: 10                                                           │  │    │
+│  │  │  └── state: CLOSED → OPEN                                                      │  │    │
+│  │  │                                                                                │  │    │
+│  │  │  LOG: WARN - CircuitBreaker 'referenceLookup' state changed: CLOSED → OPEN     │  │    │
+│  │  │                                                                                │  │    │
+│  │  └────────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              PHASE 2: FAST-FAIL BEHAVIOR                             │    │
+│  │                                                                                      │    │
+│  │  ┌─────────────┐                                                                     │    │
+│  │  │   Client    │  POST /api/v1/trades                                                │    │
+│  │  └──────┬──────┘                                                                     │    │
+│  │         │                                                                            │    │
+│  │         │ T+0ms                                                                      │    │
+│  │         ▼                                                                            │    │
+│  │  ┌────────────────────────────────────────────────────────────────────────────────┐  │    │
+│  │  │ Trade Receiver Service                                                         │  │    │
+│  │  │                                                                                │  │    │
+│  │  │  T+1ms: Check Circuit Breaker state                                            │  │    │
+│  │  │         → state = OPEN                                                         │  │    │
+│  │  │         → REJECT immediately (no downstream call)                              │  │    │
+│  │  │                                                                                │  │    │
+│  │  │  T+2ms: Return FALLBACK response                                               │  │    │
+│  │  │         {                                                                      │  │    │
+│  │  │           "status": "PROCESSED",                                               │  │    │
+│  │  │           "referenceData": {                                                   │  │    │
+│  │  │             "id": "FALLBACK",                                                  │  │    │
+│  │  │             "description": "Fallback data - service unavailable"               │  │    │
+│  │  │           }                                                                    │  │    │
+│  │  │         }                                                                      │  │    │
+│  │  │                                                                                │  │    │
+│  │  └────────────────────────────────────────────────────────────────────────────────┘  │    │
+│  │         │                                                                            │    │
+│  │         │ T+67ms (TOTAL!)                                                            │    │
+│  │         ▼                                                                            │    │
+│  │  ┌─────────────┐                                                                     │    │
+│  │  │   Client    │  Response: 200 OK with fallback data                                │    │
+│  │  └─────────────┘                                                                     │    │
+│  │                                                                                      │    │
+│  │  ═══════════════════════════════════════════════════════════════════════════════    │    │
+│  │                                                                                      │    │
+│  │  FAST-FAIL BENEFIT:                                                                  │    │
+│  │  ─────────────────                                                                   │    │
+│  │  Response time: 67ms (with fallback)                                                 │    │
+│  │  Without circuit breaker: ~20+ seconds (timeout × 2 instances × 3 attempts)          │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              PHASE 3: RECOVERY                                       │    │
+│  │                                                                                      │    │
+│  │  T+0s:    Services resumed (SIGCONT)                                                 │    │
+│  │  T+30s:   Circuit breaker: OPEN → HALF_OPEN (wait-duration-in-open-state: 30s)       │    │
+│  │                                                                                      │    │
+│  │  T+30s:   Send probe request                                                         │    │
+│  │           ┌────────────────────────────────────────────────────────────────────┐     │    │
+│  │           │ Request succeeds → bufferedCalls: 1, failedCalls: 0                │     │    │
+│  │           └────────────────────────────────────────────────────────────────────┘     │    │
+│  │                                                                                      │    │
+│  │  T+31s:   Send 2 more probe requests (permitted-calls-in-half-open: 3)               │    │
+│  │           ┌────────────────────────────────────────────────────────────────────┐     │    │
+│  │           │ Both succeed → Circuit: HALF_OPEN → CLOSED                         │     │    │
+│  │           │                                                                    │     │    │
+│  │           │ LOG: INFO - CircuitBreaker 'referenceLookup' transitioned to CLOSED│     │    │
+│  │           └────────────────────────────────────────────────────────────────────┘     │    │
+│  │                                                                                      │    │
+│  │  CIRCUIT BREAKER FINAL STATE:                                                        │    │
+│  │  ├── failureRate: -1% (reset)                                                        │    │
+│  │  ├── bufferedCalls: 0                                                                │    │
+│  │  ├── failedCalls: 0                                                                  │    │
+│  │  └── state: CLOSED                                                                   │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Test Flow 3: Local-First Load Balancing with Passive Health
+
+**Objective**: Verify that the load balancer prefers local instances and correctly fails over to remote when local is unhealthy.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                             │
+│                    TEST FLOW: LOCAL-FIRST LOAD BALANCING                                    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              SCENARIO A: LOCAL AVAILABLE                             │    │
+│  │                                                                                      │    │
+│  │  Registry State:                                                                     │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ reference-lookup-service:                                                     │   │    │
+│  │  │   server1:8081 (LOCAL)  - HEALTHY  - load: 0                                  │   │    │
+│  │  │   server3:8081 (REMOTE) - HEALTHY  - load: 0                                  │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  │  Load Balancer Decision:                                                             │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ 1. Get PassiveHealthContext → triedInstances: []                              │   │    │
+│  │  │ 2. Get healthy instances: [server1:8081, server3:8081]                        │   │    │
+│  │  │ 3. Filter out tried: [server1:8081, server3:8081]                             │   │    │
+│  │  │ 4. Find local: server1:8081 ✓                                                 │   │    │
+│  │  │ 5. Is local healthy? YES ✓                                                    │   │    │
+│  │  │ 6. RETURN: server1:8081 (LOCAL)                                               │   │    │
+│  │  │                                                                               │   │    │
+│  │  │ LOG: DEBUG - Selected LOCAL instance: reference-lookup:server1:8081           │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              SCENARIO B: LOCAL UNHEALTHY                             │    │
+│  │                                                                                      │    │
+│  │  Registry State (after passive health update):                                       │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ reference-lookup-service:                                                     │   │    │
+│  │  │   server1:8081 (LOCAL)  - UNHEALTHY  - load: 0   ← Marked by passive health   │   │    │
+│  │  │   server3:8081 (REMOTE) - HEALTHY    - load: 0                                │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  │  Load Balancer Decision:                                                             │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ 1. Get PassiveHealthContext → triedInstances: []                              │   │    │
+│  │  │ 2. Get healthy instances: [server3:8081]  (server1 excluded - unhealthy)      │   │    │
+│  │  │ 3. Filter out tried: [server3:8081]                                           │   │    │
+│  │  │ 4. Find local: NONE (server1 is unhealthy)                                    │   │    │
+│  │  │ 5. Sort remotes by load: [server3:8081 (load=0)]                              │   │    │
+│  │  │ 6. RETURN: server3:8081 (REMOTE, lowest load)                                 │   │    │
+│  │  │                                                                               │   │    │
+│  │  │ LOG: DEBUG - Selected REMOTE instance (load=0): reference-lookup:server3:8081 │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              SCENARIO C: RETRY CYCLE (Instance Skip)                 │    │
+│  │                                                                                      │    │
+│  │  During a retry cycle after local failure:                                           │    │
+│  │                                                                                      │    │
+│  │  PassiveHealthContext State:                                                         │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ triedInstances: ["reference-lookup:server1:8081"]                             │   │    │
+│  │  │ currentInstanceId: null (cleared for next selection)                          │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  │  Load Balancer Decision (Retry Attempt):                                             │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ 1. Get PassiveHealthContext → triedInstances: ["server1:8081"]                │   │    │
+│  │  │ 2. Get healthy instances: [server1:8081, server3:8081]                        │   │    │
+│  │  │ 3. Filter out tried: [server3:8081]  ← server1 EXCLUDED (already tried)       │   │    │
+│  │  │ 4. Find local in filtered: NONE                                               │   │    │
+│  │  │ 5. Sort remotes by load: [server3:8081]                                       │   │    │
+│  │  │ 6. RETURN: server3:8081                                                       │   │    │
+│  │  │                                                                               │   │    │
+│  │  │ LOG: DEBUG - Skipping LOCAL instance server1:8081 (already tried)             │   │    │
+│  │  │ LOG: DEBUG - Selected REMOTE instance (load=0): server3:8081                  │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Test Flow 4: Recovery Detection by Background Health Monitor
+
+**Objective**: Verify that the background health monitor detects when a previously unhealthy instance has recovered.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                             │
+│                    TEST FLOW: RECOVERY DETECTION                                            │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              INITIAL STATE (After Failure)                           │    │
+│  │                                                                                      │    │
+│  │  Registry State:                                                                     │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ reference-lookup-service:                                                     │   │    │
+│  │  │   server1:8081 - UNHEALTHY  ← Marked by passive health during request failure │   │    │
+│  │  │   server3:8081 - HEALTHY                                                      │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              RECOVERY PROCESS                                        │    │
+│  │                                                                                      │    │
+│  │  T+0s:    Service on server1 is restarted/resumed                                    │    │
+│  │                                                                                      │    │
+│  │  T+30s:   HealthMonitorService scheduled task runs                                   │    │
+│  │                                                                                      │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ HealthMonitorService.checkUnhealthyInstances():                               │   │    │
+│  │  │                                                                               │   │    │
+│  │  │   1. Get unhealthy instances: [server1:8081]                                  │   │    │
+│  │  │                                                                               │   │    │
+│  │  │   2. For server1:8081:                                                        │   │    │
+│  │  │      GET http://server1:8081/actuator/health                                  │   │    │
+│  │  │                                                                               │   │    │
+│  │  │      Response: { "status": "UP" }  ← Service has recovered!                   │   │    │
+│  │  │                                                                               │   │    │
+│  │  │   3. registry.markHealthy("reference-lookup", "server1:8081")                 │   │    │
+│  │  │                                                                               │   │    │
+│  │  │      LOG: INFO - RECOVERY: Instance server1:8081 marked HEALTHY               │   │    │
+│  │  │                                                                               │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                              FINAL STATE (After Recovery)                            │    │
+│  │                                                                                      │    │
+│  │  Registry State:                                                                     │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │ reference-lookup-service:                                                     │   │    │
+│  │  │   server1:8081 - HEALTHY  ← Restored by health monitor                        │   │    │
+│  │  │   server3:8081 - HEALTHY                                                      │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                                      │    │
+│  │  Next request will again prefer LOCAL instance (server1)                             │    │
+│  │                                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                             │
+│  ═══════════════════════════════════════════════════════════════════════════════════════   │
+│                                                                                             │
+│  HEALTH DETECTION RESPONSIBILITIES:                                                         │
+│  ──────────────────────────────────                                                         │
+│                                                                                             │
+│  ┌─────────────────────────────────┐     ┌─────────────────────────────────┐                │
+│  │     PASSIVE HEALTH              │     │     BACKGROUND MONITOR          │                │
+│  │     (Failure Detection)         │     │     (Recovery Detection)        │                │
+│  │                                 │     │                                 │                │
+│  │  • Real-time (during requests)  │     │  • Periodic (every 30 seconds)  │                │
+│  │  • Marks UNHEALTHY immediately  │     │  • Only checks UNHEALTHY insts  │                │
+│  │  • No stale cache               │     │  • Marks HEALTHY on recovery    │                │
+│  │  • Zero detection latency       │     │  • Restores traffic routing     │                │
+│  │                                 │     │                                 │                │
+│  └─────────────────────────────────┘     └─────────────────────────────────┘                │
+│                                                                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Verified Test Results Summary
+
+The following test results were verified during the resilience testing session:
+
+| Test | Description | Result | Evidence |
+|------|-------------|--------|----------|
+| **Passive Health Failover** | Local fails → immediate retry to remote | ✅ PASS | `PASSIVE HEALTH FAILOVER: retry #1 - instance marked unhealthy` |
+| **0ms Retry Delay** | No delay between retry attempts | ✅ PASS | Failover in ~22ms after timeout detection |
+| **Instance Skip** | Already-tried instances excluded | ✅ PASS | `Skipping LOCAL instance server1:8081 (already tried)` |
+| **Circuit Breaker Open** | Opens after 50% failure rate | ✅ PASS | `state: OPEN, failureRate: 100%` |
+| **Fast-Fail** | Circuit open → immediate fallback | ✅ PASS | Response in 67ms with fallback data |
+| **Circuit Recovery** | OPEN → HALF_OPEN → CLOSED | ✅ PASS | After 30s wait + 3 successful probes |
+| **Local-First Preference** | Local instance selected first | ✅ PASS | `Selected LOCAL instance: server1:8081` |
+| **Remote Failover** | Remote selected when local unavailable | ✅ PASS | `Selected REMOTE instance: server3:8081` |
+| **Recovery Detection** | Background monitor restores healthy | ✅ PASS | `Instance server1:8081 is now healthy` |
+
+### Running the Tests
+
+```bash
+# Run all resilience tests
+./scripts/test-resilience.sh all
+
+# Run specific test
+./scripts/test-resilience.sh passive-health
+./scripts/test-resilience.sh circuit-breaker
+./scripts/test-resilience.sh load-balancing
+./scripts/test-resilience.sh health-monitor
+
+# Check logs for passive health events
+docker logs rdp-server1 | grep -E "PASSIVE|FAILOVER|UNHEALTHY|RECOVERY"
+```

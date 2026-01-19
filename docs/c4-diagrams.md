@@ -312,6 +312,113 @@ Detailed view of the Local-First Load Balancing mechanism.
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Level 3: Component Diagram - Passive Health Pattern
+
+Detailed view of the Passive Health components and their interactions.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                             │
+│                         Passive Health Pattern Components                                   │
+│                                                                                             │
+│  ┌────────────────────────────────────────────────────────────────────────────────────────┐ │
+│  │                              Request Flow (with Passive Health)                        │ │
+│  │                                                                                        │ │
+│  │   ┌─────────────────┐                                                                  │ │
+│  │   │  Feign Client   │                                                                  │ │
+│  │   │  (REST Call)    │                                                                  │ │
+│  │   └────────┬────────┘                                                                  │ │
+│  │            │                                                                           │ │
+│  │            ▼                                                                           │ │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────────┐  │ │
+│  │   │                    Resilience4j Retry Layer                                     │  │ │
+│  │   │                                                                                 │  │ │
+│  │   │   ┌───────────────────────┐        ┌───────────────────────────────────────┐    │  │ │
+│  │   │   │     RetryConfig       │        │  PassiveHealthRetryEventListener      │    │  │ │
+│  │   │   │                       │        │                                       │    │  │ │
+│  │   │   │  max-attempts: 3      │◄──────►│  onRetry():                           │    │  │ │
+│  │   │   │  wait-duration: 0ms   │ events │    - Mark instance UNHEALTHY          │    │  │ │
+│  │   │   │  exponential: false   │        │    - Add to tried instances           │    │  │ │
+│  │   │   │                       │        │  onSuccess(): Clear context           │    │  │ │
+│  │   │   └───────────────────────┘        │  onError(): Log exhausted retries     │    │  │ │
+│  │   │                                    └───────────────────────────────────────┘    │  │ │
+│  │   │                                                     │                           │  │ │
+│  │   └─────────────────────────────────────────────────────┼───────────────────────────┘  │ │
+│  │                                                         │                              │ │
+│  │            ┌────────────────────────────────────────────┘                              │ │
+│  │            │                                                                           │ │
+│  │            ▼                                                                           │ │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────────┐  │ │
+│  │   │                     PassiveHealthContext (ThreadLocal)                          │  │ │
+│  │   │                                                                                 │  │ │
+│  │   │   ┌───────────────────────────────────────────────────────────────────────┐     │  │ │
+│  │   │   │  RequestContext (per thread)                                          │     │  │ │
+│  │   │   │                                                                       │     │  │ │
+│  │   │   │   triedInstances: Set<String>     ← Track failed instances            │     │  │ │
+│  │   │   │   currentInstanceId: String       ← Current target for failure mark   │     │  │ │
+│  │   │   │   currentServiceId: String        ← Service being called              │     │  │ │
+│  │   │   │                                                                       │     │  │ │
+│  │   │   │   + markTried(instanceId)         ← Called by retry listener          │     │  │ │
+│  │   │   │   + hasTried(instanceId): bool    ← Used by load balancer             │     │  │ │
+│  │   │   │   + setCurrentInstance(svc, id)   ← Set before each attempt           │     │  │ │
+│  │   │   └───────────────────────────────────────────────────────────────────────┘     │  │ │
+│  │   │                                                                                 │  │ │
+│  │   └─────────────────────────────────────────────────────────────────────────────────┘  │ │
+│  │                                                         │                              │ │
+│  │            ┌────────────────────────────────────────────┘                              │ │
+│  │            │                                                                           │ │
+│  │            ▼                                                                           │ │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────────┐  │ │
+│  │   │                     LocalFirstLoadBalancer                                      │  │ │
+│  │   │                                                                                 │  │ │
+│  │   │   choose(serviceId):                                                            │  │ │
+│  │   │     1. Get PassiveHealthContext.current()                                       │  │ │
+│  │   │     2. Get triedInstances set                                                   │  │ │
+│  │   │     3. Filter: healthy AND NOT in triedInstances                                │  │ │
+│  │   │     4. If local available → select local                                        │  │ │
+│  │   │     5. Else → select remote by lowest load                                      │  │ │
+│  │   │     6. Call context.setCurrentInstance() for passive health tracking            │  │ │
+│  │   │                                                                                 │  │ │
+│  │   └─────────────────────────────────────────────────────────────────────────────────┘  │ │
+│  │                                                         │                              │ │
+│  │            ┌────────────────────────────────────────────┘                              │ │
+│  │            │                                                                           │ │
+│  │            ▼                                                                           │ │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────────┐  │ │
+│  │   │                     ServiceInstanceRegistry                                     │  │ │
+│  │   │                                                                                 │  │ │
+│  │   │   Thread-Safe Operations:                                                       │  │ │
+│  │   │   + markUnhealthy(serviceId, instanceId)  ← Called by PassiveHealthListener     │  │ │
+│  │   │   + markHealthy(serviceId, instanceId)    ← Called by HealthMonitorService      │  │ │
+│  │   │   + getHealthyInstances(serviceId)        ← Used by LoadBalancer                │  │ │
+│  │   │   + getLocalInstance(serviceId)           ← Local-first selection               │  │ │
+│  │   │   + getRemoteInstancesByLoad(serviceId)   ← Load-based fallback                 │  │ │
+│  │   │                                                                                 │  │ │
+│  │   └─────────────────────────────────────────────────────────────────────────────────┘  │ │
+│  │                                                                                        │ │
+│  └────────────────────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                             │
+│  ┌────────────────────────────────────────────────────────────────────────────────────────┐ │
+│  │                     Health Detection Responsibilities                                  │ │
+│  │                                                                                        │ │
+│  │   ┌───────────────────────────────────┐   ┌───────────────────────────────────┐        │ │
+│  │   │     FAILURE DETECTION             │   │     RECOVERY DETECTION            │        │ │
+│  │   │     (Real-time)                   │   │     (Background)                  │        │ │
+│  │   │                                   │   │                                   │        │ │
+│  │   │   PassiveHealthRetryEventListener │   │   HealthMonitorService            │        │ │
+│  │   │                                   │   │                                   │        │ │
+│  │   │   • Triggered during requests     │   │   • Runs every 30 seconds         │        │ │
+│  │   │   • Immediate detection (0ms)     │   │   • Only checks UNHEALTHY insts   │        │ │
+│  │   │   • Marks instance UNHEALTHY      │   │   • Marks recovered → HEALTHY     │        │ │
+│  │   │   • No stale cache problem        │   │   • Restores traffic to instance  │        │ │
+│  │   │                                   │   │                                   │        │ │
+│  │   └───────────────────────────────────┘   └───────────────────────────────────┘        │ │
+│  │                                                                                        │ │
+│  └────────────────────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ## Class Diagram - Core Components
 
 ```
@@ -326,47 +433,55 @@ Detailed view of the Local-First Load Balancing mechanism.
 │  │ - host: String                │  ◄──  │   <String, List<Instance>>    │                 │
 │  │ - port: int                   │       ├───────────────────────────────┤                 │
 │  │ - isLocal: boolean            │       │ + getInstances(serviceId)     │                 │
-│  │ - healthy: AtomicBoolean      │       │ + updateHealth(instance, bool)│                 │
-│  │ - currentLoad: AtomicInteger  │       │ + updateLoad(instance, int)   │                 │
+│  │ - healthy: AtomicBoolean      │       │ + markUnhealthy(svc, instId)  │ ◄── Passive     │
+│  │ - currentLoad: AtomicInteger  │       │ + markHealthy(svc, instId)    │     Health      │
 │  │ - lastCheck: AtomicLong       │       │ + getLocalInstance(serviceId) │                 │
 │  ├───────────────────────────────┤       │ + getHealthyInstances(svcId)  │                 │
-│  │ + isHealthy(): boolean        │       └───────────────────────────────┘                 │
-│  │ + getLoad(): int              │                      ▲                                  │
-│  │ + markHealthy(boolean)        │                      │                                  │
-│  │ + incrementLoad()             │                      │ uses                             │
-│  │ + decrementLoad()             │                      │                                  │
-│  └───────────────────────────────┘       ┌───────────────────────────────┐                 │
+│  │ + isHealthy(): boolean        │       │ + getRemoteInstancesByLoad()  │                 │
+│  │ + getLoad(): int              │       └───────────────────────────────┘                 │
+│  │ + markHealthy(boolean)        │                      ▲                                  │
+│  │ + incrementLoad()             │                      │                                  │
+│  │ + decrementLoad()             │                      │ uses                             │
+│  └───────────────────────────────┘                      │                                  │
+│                                          ┌───────────────────────────────┐                 │
 │                                          │   LocalFirstLoadBalancer      │                 │
-│                                          ├───────────────────────────────┤                 │
-│                                          │ - registry: Registry          │                 │
-│                                          │ - localHost: String           │                 │
 │  ┌───────────────────────────────┐       ├───────────────────────────────┤                 │
-│  │    HealthMonitorService       │       │ + choose(serviceId): Instance │                 │
-│  ├───────────────────────────────┤       │ - selectLocalFirst(): Instance│                 │
-│  │ - executor: ScheduledExecutor │──────►│ - selectByLoad(): Instance    │                 │
-│  │ - registry: Registry          │       └───────────────────────────────┘                 │
-│  │ - checkInterval: Duration     │                                                         │
-│  │ - httpClient: RestClient      │                                                         │
-│  ├───────────────────────────────┤                                                         │
-│  │ + start()                     │       ┌───────────────────────────────┐                 │
-│  │ + stop()                      │       │   <<interface>>               │                 │
-│  │ - checkHealth(instance)       │       │   ReactorServiceInstance      │                 │
-│  │ - updateRegistry(results)     │       │   ListSupplier                │                 │
-│  └───────────────────────────────┘       ├───────────────────────────────┤                 │
-│                                          │ + get(): Flux<List<Instance>> │                 │
-│                                          └───────────────────────────────┘                 │
-│                                                         ▲                                  │
-│  ┌───────────────────────────────┐                      │ implements                       │
-│  │    ResilienceConfig           │       ┌───────────────────────────────┐                 │
-│  ├───────────────────────────────┤       │ LocalFirstServiceInstance     │                 │
-│  │ - maxRetries: int             │       │ ListSupplier                  │                 │
-│  │ - waitDuration: Duration      │       ├───────────────────────────────┤                 │
-│  │ - multiplier: double          │       │ - loadBalancer: LocalFirstLB  │                 │
-│  │ - circuitBreakerThreshold: %  │       │ - serviceId: String           │                 │
+│  │  PassiveHealthContext         │       │ - registry: Registry          │                 │
+│  ├───────────────────────────────┤       │ - serviceId: String           │                 │
+│  │ - context: ThreadLocal        │◄──────┤───────────────────────────────┤                 │
+│  ├───────────────────────────────┤       │ + choose(request): Instance   │                 │
+│  │ + current(): RequestContext   │       │ - skipTriedInstances()        │                 │
+│  │ + clear()                     │       │ - setCurrentInstanceInContext │                 │
+│  └───────────────────────────────┘       └───────────────────────────────┘                 │
+│            │                                            ▲                                  │
+│            │ uses                                       │ notifies                         │
+│            ▼                                            │                                  │
+│  ┌───────────────────────────────┐       ┌───────────────────────────────┐                 │
+│  │     RequestContext            │       │ PassiveHealthRetryEvent       │                 │
+│  ├───────────────────────────────┤       │ Listener                      │                 │
+│  │ - triedInstances: Set         │       ├───────────────────────────────┤                 │
+│  │ - currentInstanceId: String   │◄──────│ - retryRegistry: RetryRegistry│                 │
+│  │ - currentServiceId: String    │       │ - instanceRegistry: Registry  │                 │
 │  ├───────────────────────────────┤       ├───────────────────────────────┤                 │
-│  │ + retryConfig(): RetryConfig  │       │ + get(): Flux<List<Instance>> │                 │
-│  │ + circuitBreaker(): CB        │       └───────────────────────────────┘                 │
-│  └───────────────────────────────┘                                                         │
+│  │ + markTried(instanceId)       │       │ + onRetry(event)              │                 │
+│  │ + hasTried(instanceId): bool  │       │ + onSuccess(event)            │                 │
+│  │ + setCurrentInstance()        │       │ + onError(event)              │                 │
+│  │ + getTriedInstances(): Set    │       │ - registerEventConsumers()    │                 │
+│  └───────────────────────────────┘       └───────────────────────────────┘                 │
+│                                                                                            │
+│  ┌───────────────────────────────┐       ┌───────────────────────────────┐                 │
+│  │    HealthMonitorService       │       │   <<interface>>               │                 │
+│  ├───────────────────────────────┤       │   ReactorServiceInstance      │                 │
+│  │ - executor: ScheduledExecutor │       │   LoadBalancer                │                 │
+│  │ - registry: Registry          │       ├───────────────────────────────┤                 │
+│  │ - checkInterval: 30s          │       │ + choose(request): Mono       │                 │
+│  │ - httpClient: RestClient      │       └───────────────────────────────┘                 │
+│  ├───────────────────────────────┤                      ▲                                  │
+│  │ + start()                     │                      │ implements                       │
+│  │ + stop()                      │       ┌───────────────────────────────┐                 │
+│  │ - checkUnhealthyInstances()   │       │ LocalFirstLoadBalancer        │                 │
+│  │ - markRecoveredHealthy()      │       │ (as shown above)              │                 │
+│  └───────────────────────────────┘       └───────────────────────────────┘                 │
 │                                                                                            │
 └────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

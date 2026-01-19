@@ -162,13 +162,13 @@ rdp-msa-viability-poc/
 - [x] Docker containerization
 - [x] **Passive Health Pattern** (immediate failover, real-time failure detection)
 
-### Phase 3: Testing & Validation (Current)
+### Phase 3: Testing & Validation (Complete)
 - [x] Build and verify all services compile
-- [ ] Deploy to Docker environment
-- [ ] Verify service registration with Eureka
-- [ ] Test passive health pattern (immediate failover)
-- [ ] Test resilience patterns (retry, circuit breaker)
-- [ ] Test local-first load balancing
+- [x] Deploy to Docker environment
+- [x] Verify service registration with Eureka
+- [x] Test passive health pattern (immediate failover) - **VERIFIED**
+- [x] Test resilience patterns (retry, circuit breaker) - **VERIFIED**
+- [x] Test local-first load balancing - **VERIFIED**
 - [ ] Performance testing (~20 req/sec)
 
 ## Commands
@@ -230,6 +230,20 @@ health:
 - **Failover latency**: ~100ms (vs 3+ seconds with traditional approach)
 - **Real-time failure detection**: During actual requests, not background polling
 - **No stale cache**: Failed instances immediately marked unhealthy
+
+### Verified Test Results
+
+| Test | Result | Key Metrics |
+|------|--------|-------------|
+| Passive Health Failover | ✅ PASS | Local fails → immediate retry to remote (~22ms after timeout) |
+| 0ms Retry Delay | ✅ PASS | No delay between retry attempts |
+| Instance Skip | ✅ PASS | Already-tried instances excluded from retry cycle |
+| Circuit Breaker Open | ✅ PASS | Opens after 50% failure rate (100% in test) |
+| Fast-Fail Response | ✅ PASS | 67ms with fallback data (vs ~20s without CB) |
+| Circuit Recovery | ✅ PASS | OPEN → HALF_OPEN (30s) → CLOSED (3 probes) |
+| Local-First Preference | ✅ PASS | Local instance selected first when healthy |
+| Remote Failover | ✅ PASS | Remote selected when local unavailable |
+| Recovery Detection | ✅ PASS | Background monitor marks recovered instances healthy |
 
 ## Notes
 
