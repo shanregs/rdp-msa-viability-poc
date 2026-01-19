@@ -452,14 +452,114 @@ All servers operate within the same Docker network, enabling:
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Passive Health Pattern
+
+The system implements a **Passive Health** pattern for real-time failure detection with immediate failover.
+
+### Key Concepts
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           PASSIVE HEALTH ARCHITECTURE                           │
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                         FAILURE DETECTION                                │   │
+│  │                                                                          │   │
+│  │   Traditional Approach          vs       Passive Health Approach         │   │
+│  │   ────────────────────                   ─────────────────────────       │   │
+│  │                                                                          │   │
+│  │   Background polling (10s)              Real-time during requests        │   │
+│  │   Delayed detection                     Immediate detection              │   │
+│  │   500ms+ retry delays                   0ms retry delay                  │   │
+│  │   Total failover: 3+ seconds            Total failover: ~100ms           │   │
+│  │                                                                          │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │                         RECOVERY DETECTION                               │   │
+│  │                                                                          │   │
+│  │   Background Health Monitor (30-second interval)                         │   │
+│  │   - Only checks instances marked as UNHEALTHY                           │   │
+│  │   - Restores healthy status when instance recovers                      │   │
+│  │   - Minimal overhead (recovery-focused, not failure-focused)            │   │
+│  │                                                                          │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Passive Health Flow
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐     ┌─────────────┐
+│ Client      │     │ LocalFirstLB │     │ Instance A  │     │ Instance B  │
+│ Service     │     │ + Retry      │     │ (Local)     │     │ (Remote)    │
+└──────┬──────┘     └──────┬───────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                    │                   │
+       │  request()        │                    │                   │
+       │──────────────────►│                    │                   │
+       │                   │                    │                   │
+       │                   │ choose() → local   │                   │
+       │                   │───────────────────►│                   │
+       │                   │                    │                   │
+       │                   │    FAILURE         │                   │
+       │                   │◄───────────────────│                   │
+       │                   │                    │                   │
+       │                   │  ┌─────────────────────────────────┐   │
+       │                   │  │ PASSIVE HEALTH (0ms):           │   │
+       │                   │  │ 1. Mark Instance A UNHEALTHY    │   │
+       │                   │  │ 2. Add to tried instances set   │   │
+       │                   │  │ 3. Immediate retry (no delay)   │   │
+       │                   │  └─────────────────────────────────┘   │
+       │                   │                    │                   │
+       │                   │ choose() → remote (skip A)             │
+       │                   │──────────────────────────────────────► │
+       │                   │                    │                   │
+       │                   │    SUCCESS         │                   │
+       │                   │◄────────────────────────────────────── │
+       │                   │                    │                   │
+       │  response         │                    │                   │
+       │◄──────────────────│                    │                   │
+```
+
+### Key Components
+
+| Component | Description |
+|-----------|-------------|
+| **PassiveHealthContext** | Thread-local context tracking tried instances during retry cycle |
+| **PassiveHealthRetryEventListener** | Listens to Resilience4j retry events, marks instances unhealthy |
+| **LocalFirstLoadBalancer** | Skips already-tried instances, tracks current instance for passive health |
+| **ServiceInstanceRegistry** | Thread-safe registry with `markUnhealthy()` and `markHealthy()` methods |
+| **HealthMonitorService** | Background recovery detection (30s interval) |
+
+### Configuration
+
+```yaml
+resilience4j:
+  retry:
+    instances:
+      referenceLookup:
+        max-attempts: 3
+        wait-duration: 0ms           # Immediate retry
+        enable-exponential-backoff: false
+
+health:
+  monitor:
+    interval: 30                     # Recovery detection only
+```
+
+---
+
 ## Non-Functional Requirements
 
 ### Performance
 - Ingestion service handles up to 20 requests/second
 - Local-first routing minimizes network latency
+- Passive health enables ~100ms failover (vs 3+ seconds with traditional retry)
 
 ### Reliability
 - Eureka HA ensures service discovery availability
+- Passive health pattern for immediate failure detection
 - Retry and circuit breaker patterns prevent cascade failures
 
 ### Scalability
@@ -468,5 +568,6 @@ All servers operate within the same Docker network, enabling:
 
 ### Observability
 - Health endpoints on all services
-- Background health monitoring
+- Background health monitoring for recovery detection
 - Actuator metrics exposure
+- Passive health logging for failure tracking

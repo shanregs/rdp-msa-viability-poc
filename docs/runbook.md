@@ -299,6 +299,128 @@ done
 
 ---
 
+### Problem: Passive health not marking instances unhealthy
+
+**Symptoms:**
+- Failed instances still receiving traffic
+- No "PASSIVE HEALTH" log messages during failures
+- Retries happening but not failing over to other instances
+
+**Solutions:**
+1. Verify PassiveHealthRetryEventListener is initialized:
+   ```bash
+   docker logs <container> | grep "PassiveHealthRetryEventListener initialized"
+   ```
+
+2. Check retry configuration has 0ms wait-duration:
+   ```bash
+   docker exec <container> cat /app/config/application.yml | grep -A5 "retry:"
+   # Expected: wait-duration: 0ms
+   ```
+
+3. Verify logs show passive health events:
+   ```bash
+   docker logs <container> | grep -E "PASSIVE HEALTH|FAILOVER|UNHEALTHY"
+   ```
+
+4. Check PassiveHealthContext is being used:
+   ```bash
+   docker logs <container> | grep "PassiveHealthContext"
+   ```
+
+---
+
+### Problem: Instance stuck in unhealthy state
+
+**Symptoms:**
+- Instance is running and responding to health checks
+- But traffic is not being routed to it
+- Logs show instance was marked UNHEALTHY
+
+**Solutions:**
+1. Check background health monitor is running:
+   ```bash
+   docker logs <container> | grep "HealthMonitor"
+   # Should see health checks every 30 seconds
+   ```
+
+2. Verify instance health endpoint is responding:
+   ```bash
+   curl http://<instance>:<port>/actuator/health
+   # Expected: {"status":"UP"}
+   ```
+
+3. Wait for recovery detection (up to 30 seconds):
+   ```bash
+   docker logs -f <container> | grep "RECOVERY"
+   # Expected: INFO - RECOVERY: Instance xxx marked HEALTHY
+   ```
+
+4. If recovery not detected, check health monitor interval:
+   ```bash
+   # Verify health.monitor.interval is set (default: 30 seconds)
+   docker exec <container> env | grep HEALTH_MONITOR
+   ```
+
+---
+
+### Problem: Slow failover despite passive health
+
+**Symptoms:**
+- Failover taking longer than expected (~100ms)
+- Logs show retry delays
+
+**Solutions:**
+1. Verify retry wait-duration is 0ms:
+   ```bash
+   curl http://localhost:8082/actuator/configprops | jq '.contexts[].beans["resilience4j.retry-io.github.resilience4j.retry.RetryProperties"]'
+   ```
+
+2. Check exponential backoff is disabled:
+   ```yaml
+   # application.yml should have:
+   resilience4j:
+     retry:
+       instances:
+         referenceLookup:
+           wait-duration: 0ms
+           enable-exponential-backoff: false
+   ```
+
+3. Check for network latency issues:
+   ```bash
+   docker exec <container> ping -c 3 <target-host>
+   ```
+
+---
+
+### Passive Health Log Patterns
+
+#### Successful Failover
+```
+WARN  - PASSIVE HEALTH: Instance reference-lookup:server1:8081 marked UNHEALTHY
+INFO  - PASSIVE HEALTH FAILOVER: referenceLookup retry #1 - instance marked unhealthy, trying next
+DEBUG - Skipping LOCAL instance reference-lookup:server1:8081 (already tried)
+DEBUG - Selected REMOTE instance for reference-lookup-service (load=0): reference-lookup:server3:8081
+INFO  - PASSIVE HEALTH: referenceLookup succeeded after 1 retries
+```
+
+#### All Instances Failed
+```
+WARN  - PASSIVE HEALTH: Instance reference-lookup:server1:8081 marked UNHEALTHY
+WARN  - PASSIVE HEALTH: Instance reference-lookup:server3:8081 marked UNHEALTHY
+ERROR - PASSIVE HEALTH: referenceLookup exhausted all 3 retries. Tried instances: [...]
+```
+
+#### Recovery Detection
+```
+INFO  - HealthMonitor: Checking instance health for recovery
+INFO  - RECOVERY: Instance reference-lookup:server1:8081 marked HEALTHY
+INFO  - HealthMonitor: reference-lookup-service@server1 - HEALTHY
+```
+
+---
+
 ## Shutdown Procedure
 
 ### Graceful Shutdown (Recommended)
