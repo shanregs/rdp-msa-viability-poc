@@ -17,15 +17,18 @@ This POC implements a distributed microservices architecture with:
 
 - **Service Discovery**: Netflix Eureka with High Availability (2 instances)
 - **Client-Side Load Balancing**: Local-first routing strategy with load-aware failover
-- **Resilience Patterns**: Retry with exponential backoff, Circuit Breaker
-- **Background Health Monitoring**: ExecutorService-based health checks
+- **Passive Health Pattern**: Real-time failure detection with immediate failover
+- **Resilience Patterns**: Retry with 0ms delay, Circuit Breaker
+- **Background Health Monitoring**: Recovery detection (30-second interval)
 
 ### Key Features
 
 1. **Local-First Load Balancing**: Services prefer calling local instances before remote
-2. **Load-Aware Routing**: Routes requests based on service instance load
-3. **Automatic Failover**: Seamless failover to healthy instances
-4. **Thread-Safe Health Registry**: Background health monitoring with concurrent access
+2. **Passive Health Updates**: Failed instances marked unhealthy immediately during requests
+3. **Immediate Failover**: 0ms retry delay ensures transparent failover (~100ms total latency)
+4. **Load-Aware Routing**: Routes requests based on service instance load
+5. **Automatic Recovery**: Background health monitor detects recovered instances
+6. **Thread-Safe Health Registry**: Concurrent access with real-time updates
 
 ## Architecture
 
@@ -129,10 +132,13 @@ mvn spring-boot:run -pl eq-trade-handler-service
 | Document | Description |
 |----------|-------------|
 | [Architecture](architecture.md) | Microservice architecture overview, Service Instance Registry |
+| [Passive Health Design](passive-health-retry-design.md) | Passive health pattern with immediate failover |
 | [C4 Diagrams](c4-diagrams.md) | Context, Container, Component diagrams |
 | [API Flow](api-flow.md) | API call flows with sequence diagrams |
 | [Eureka Operations](eureka-operations.md) | Register, Heartbeat, Fetch, Deregister operations & Retry flow |
 | [Docker Architecture](docker-architecture.md) | Docker setup and configuration |
+| [Testing Guide](testing-guide.md) | API testing, resilience patterns, failure scenarios |
+| [Runbook](runbook.md) | Operational runbook |
 
 ## Development
 

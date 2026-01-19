@@ -25,37 +25,51 @@ eureka:
     services: reference-lookup-service,check-eligible-service
     interval: 30000
 
-# Health monitoring
+# Health monitoring (for recovery detection only - passive health handles failures)
 health:
   monitor:
     enabled: true
-    interval: 10
+    interval: 30
     timeout: 5
 
 # Resilience4j configuration
+# Using passive health pattern: 0ms delay for immediate failover to next instance
 resilience4j:
   retry:
     instances:
       referenceLookup:
         max-attempts: 3
-        wait-duration: 500ms
-        exponential-backoff-multiplier: 2
+        wait-duration: 0ms
+        enable-exponential-backoff: false
         retry-exceptions:
           - java.io.IOException
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
           - java.util.concurrent.TimeoutException
           - feign.FeignException
+          - feign.RetryableException
       checkEligible:
         max-attempts: 3
-        wait-duration: 500ms
-        exponential-backoff-multiplier: 2
+        wait-duration: 0ms
+        enable-exponential-backoff: false
         retry-exceptions:
           - java.io.IOException
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
           - java.util.concurrent.TimeoutException
           - feign.FeignException
+          - feign.RetryableException
       regulatoryProcessing:
         max-attempts: 2
-        wait-duration: 1s
-        exponential-backoff-multiplier: 2
+        wait-duration: 0ms
+        enable-exponential-backoff: false
+        retry-exceptions:
+          - java.io.IOException
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - java.util.concurrent.TimeoutException
+          - feign.FeignException
+          - feign.RetryableException
 
   circuitbreaker:
     instances:

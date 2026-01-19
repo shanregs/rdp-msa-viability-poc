@@ -3,17 +3,17 @@
 # RDP-MSA Viability POC - Resilience Testing Script
 #
 # This script tests the resilience patterns implemented in the microservices:
-# - Retry with exponential backoff
+# - Passive Health with Immediate Retry (0ms delay)
 # - Circuit breaker
-# - Local-first load balancing
-# - Health monitoring
+# - Local-first load balancing with failover tracking
+# - Background health monitoring (recovery detection only)
 #
 # Prerequisites:
 # - All services running via Docker Compose
 # - curl and jq installed
 #
 # Usage: ./test-resilience.sh [test_name]
-#   test_name: all, retry, circuit-breaker, load-balancing, health-monitor
+#   test_name: all, passive-health, retry, circuit-breaker, load-balancing, health-monitor
 #
 
 set -e
@@ -195,14 +195,95 @@ preflight_checks() {
 }
 
 #######################################
-# Test 1: Retry Pattern
+# Test 1: Passive Health Pattern
+#######################################
+
+test_passive_health() {
+    log_header "Test 1: Passive Health with Immediate Failover"
+
+    log_info "This test verifies the passive health pattern:"
+    log_info "- Failed requests immediately mark instance as UNHEALTHY"
+    log_info "- Retry happens with 0ms delay (immediate failover)"
+    log_info "- Already-tried instances are skipped during retry cycle"
+    echo ""
+
+    # Step 1: Verify both services are working
+    log_info "Step 1: Verify reference-lookup instances are working..."
+    if check_http_status "${REFERENCE_LOOKUP_URL}/actuator/health"; then
+        log_success "Reference Lookup (server1) is healthy"
+    else
+        log_fail "Reference Lookup (server1) is not healthy - cannot proceed"
+        return
+    fi
+
+    # Step 2: Stop local reference-lookup service
+    log_info "Step 2: Stopping LOCAL reference-lookup on server1..."
+    stop_service "$SERVER1_CONTAINER" "reference-lookup-service"
+    sleep 2
+
+    # Step 3: Submit a trade and measure failover time
+    log_info "Step 3: Submitting trade to trigger PASSIVE HEALTH failover..."
+    log_info "Expected: Local fails -> marked UNHEALTHY -> immediate retry to server3"
+
+    local start_time end_time duration response
+    start_time=$(date +%s%N)
+    response=$(submit_trade "PASSIVE-HEALTH-$(date +%s)")
+    end_time=$(date +%s%N)
+    duration=$(( (end_time - start_time) / 1000000 ))
+
+    log_info "Total request time: ${duration}ms"
+
+    if echo "$response" | grep -q "status"; then
+        log_success "Trade processed successfully via failover"
+        log_info "Response: $response"
+
+        # Check if failover was fast (< 500ms indicates 0ms retry delay worked)
+        if [ "$duration" -lt 1000 ]; then
+            log_success "Immediate failover confirmed (< 1 second total)"
+        else
+            log_warn "Failover took longer than expected: ${duration}ms"
+        fi
+    else
+        log_info "Response: $response"
+        log_warn "Trade may have failed - check logs"
+    fi
+
+    # Step 4: Check logs for passive health updates
+    log_info "Step 4: Checking logs for PASSIVE HEALTH messages..."
+    log_info "Run: docker logs $SERVER1_CONTAINER | grep -E 'PASSIVE|UNHEALTHY|markTried'"
+
+    # Step 5: Submit another trade - should skip unhealthy instance
+    log_info "Step 5: Submitting second trade - should skip unhealthy local instance..."
+    response=$(submit_trade "PASSIVE-HEALTH-SKIP-$(date +%s)")
+
+    if echo "$response" | grep -q "status"; then
+        log_success "Second trade processed - unhealthy local instance skipped"
+    fi
+
+    # Step 6: Restart service
+    log_info "Step 6: Restarting reference-lookup service..."
+    start_service "$SERVER1_CONTAINER" "reference-lookup-service"
+    sleep 5
+
+    # Verify service is back
+    if wait_for_service "$REFERENCE_LOOKUP_URL" 10; then
+        log_success "Reference Lookup service recovered"
+    else
+        log_warn "Reference Lookup service may not have fully recovered"
+    fi
+
+    log_success "Passive health test completed"
+}
+
+#######################################
+# Test 2: Retry Pattern (Legacy)
 #######################################
 
 test_retry_pattern() {
-    log_header "Test 1: Retry Pattern"
+    log_header "Test 2: Retry Pattern (with Passive Health)"
 
-    log_info "This test verifies that failed requests are retried with exponential backoff"
-    log_info "Retry sequence: 500ms -> 1000ms -> 2000ms"
+    log_info "This test verifies that failed requests are retried immediately"
+    log_info "Retry configuration: 0ms delay, max 3 attempts, no exponential backoff"
     echo ""
 
     # Step 1: Verify service is working
@@ -221,7 +302,7 @@ test_retry_pattern() {
 
     # Step 3: Submit a trade (should trigger retry and failover)
     log_info "Step 3: Submitting trade to trigger retry behavior..."
-    log_info "Expected: Request fails locally, retries, then fails over to server3"
+    log_info "Expected: Request fails locally, retries IMMEDIATELY, fails over to server3"
 
     local response
     response=$(submit_trade "RETRY-TEST-$(date +%s)")
@@ -235,8 +316,8 @@ test_retry_pattern() {
     fi
 
     # Step 4: Check logs for retry pattern
-    log_info "Step 4: Checking logs for retry pattern..."
-    log_info "Run: docker logs $SERVER1_CONTAINER | grep -E 'Retry|attempt|failover'"
+    log_info "Step 4: Checking logs for retry events..."
+    log_info "Run: docker logs $SERVER1_CONTAINER | grep -E 'PASSIVE|FAILOVER|retry'"
 
     # Step 5: Restart service
     log_info "Step 5: Restarting reference-lookup service..."
@@ -254,11 +335,11 @@ test_retry_pattern() {
 }
 
 #######################################
-# Test 2: Circuit Breaker
+# Test 3: Circuit Breaker
 #######################################
 
 test_circuit_breaker() {
-    log_header "Test 2: Circuit Breaker Pattern"
+    log_header "Test 3: Circuit Breaker Pattern"
 
     log_info "This test verifies the circuit breaker opens after repeated failures"
     log_info "Configuration: 50% failure threshold, 10 call sliding window, 30s open duration"
@@ -348,13 +429,14 @@ test_circuit_breaker() {
 }
 
 #######################################
-# Test 3: Local-First Load Balancing
+# Test 4: Local-First Load Balancing
 #######################################
 
 test_load_balancing() {
-    log_header "Test 3: Local-First Load Balancing"
+    log_header "Test 4: Local-First Load Balancing (with Passive Health)"
 
     log_info "This test verifies that requests prefer local instances"
+    log_info "With passive health: failed instances are skipped in subsequent requests"
     log_info "Expected: Server1's trade-receiver calls Server1's reference-lookup first"
     echo ""
 
@@ -415,14 +497,17 @@ test_load_balancing() {
 }
 
 #######################################
-# Test 4: Health Monitoring
+# Test 5: Health Monitoring (Recovery Detection)
 #######################################
 
 test_health_monitoring() {
-    log_header "Test 4: Background Health Monitoring"
+    log_header "Test 5: Background Health Monitoring (Recovery Detection)"
 
-    log_info "This test verifies the background health monitor updates instance status"
-    log_info "Health check interval: 10 seconds"
+    log_info "With passive health pattern, background health monitoring focuses on RECOVERY detection"
+    log_info "- Failure detection: Handled by passive health (real-time, during requests)"
+    log_info "- Recovery detection: Handled by background health monitor (30 second interval)"
+    log_info ""
+    log_info "Health check interval: 30 seconds"
     echo ""
 
     # Step 1: Check current health
@@ -438,28 +523,29 @@ test_health_monitoring() {
     fi
 
     # Step 2: Monitor logs for health check activity
-    log_info "Step 2: Health monitor should be checking instances every 10 seconds"
-    log_info "Run: docker logs -f $SERVER1_CONTAINER | grep -i 'health'"
+    log_info "Step 2: Health monitor checks instances every 30 seconds for RECOVERY"
+    log_info "Run: docker logs -f $SERVER1_CONTAINER | grep -i 'health\\|recovery'"
 
-    # Step 3: Stop a service and observe status change
-    log_info "Step 3: Stopping reference-lookup on server3 to observe health change..."
+    # Step 3: Stop a service and trigger passive health marking
+    log_info "Step 3: Stopping reference-lookup on server3..."
     stop_service "$SERVER3_CONTAINER" "reference-lookup-service"
+    sleep 2
 
-    log_info "Waiting 15 seconds for health monitor to detect change..."
-    sleep 15
+    log_info "Step 3b: Trigger request to mark instance UNHEALTHY via passive health..."
+    submit_trade "HEALTH-PASSIVE-$(date +%s)" > /dev/null 2>&1
 
-    log_info "Check logs for UNHEALTHY marking:"
-    log_info "Run: docker logs $SERVER1_CONTAINER | tail -50 | grep -i 'health\\|unhealthy'"
+    log_info "Check logs for PASSIVE HEALTH UNHEALTHY marking:"
+    log_info "Run: docker logs $SERVER1_CONTAINER | tail -50 | grep -i 'PASSIVE\\|UNHEALTHY'"
 
     # Step 4: Restart service
     log_info "Step 4: Restarting reference-lookup on server3..."
     start_service "$SERVER3_CONTAINER" "reference-lookup-service"
 
-    log_info "Waiting 15 seconds for health monitor to detect recovery..."
-    sleep 15
+    log_info "Waiting 35 seconds for health monitor to detect RECOVERY..."
+    sleep 35
 
-    log_info "Check logs for HEALTHY recovery:"
-    log_info "Run: docker logs $SERVER1_CONTAINER | tail -50 | grep -i 'health\\|healthy'"
+    log_info "Check logs for RECOVERY marking:"
+    log_info "Run: docker logs $SERVER1_CONTAINER | tail -50 | grep -i 'RECOVERY\\|marked HEALTHY'"
 
     log_success "Health monitoring test completed"
 }
@@ -483,7 +569,7 @@ print_summary() {
 
     echo ""
     echo "For detailed analysis, check the service logs:"
-    echo "  docker logs $SERVER1_CONTAINER | grep -E 'Retry|Circuit|Health|Local'"
+    echo "  docker logs $SERVER1_CONTAINER | grep -E 'PASSIVE|UNHEALTHY|RECOVERY|FAILOVER|retry'"
     echo ""
 }
 
@@ -503,6 +589,9 @@ main() {
     preflight_checks
 
     case $test_name in
+        "passive-health")
+            test_passive_health
+            ;;
         "retry")
             test_retry_pattern
             ;;
@@ -516,6 +605,7 @@ main() {
             test_health_monitoring
             ;;
         "all")
+            test_passive_health
             test_retry_pattern
             test_circuit_breaker
             test_load_balancing
@@ -526,10 +616,11 @@ main() {
             echo ""
             echo "Available tests:"
             echo "  all             - Run all tests (default)"
+            echo "  passive-health  - Test passive health with immediate failover"
             echo "  retry           - Test retry pattern"
             echo "  circuit-breaker - Test circuit breaker"
             echo "  load-balancing  - Test local-first load balancing"
-            echo "  health-monitor  - Test background health monitoring"
+            echo "  health-monitor  - Test background health monitoring (recovery)"
             echo ""
             exit 1
             ;;

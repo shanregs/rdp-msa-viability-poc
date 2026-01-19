@@ -126,9 +126,12 @@ curl -X GET "http://server2:8090/api/v1/processed-trades/TRD-001" \
 
 ## Resilience Pattern Testing
 
-### 1. Retry Pattern Verification
+### 1. Passive Health with Immediate Retry
 
-The retry configuration uses exponential backoff: 500ms → 1000ms → 2000ms
+The system uses **Passive Health** pattern for real-time failure detection:
+- **0ms retry delay** - Immediate failover to next instance
+- **Passive health updates** - Failed instances marked unhealthy during request
+- **Instance skip** - Already-tried instances excluded from retry cycle
 
 #### Test Steps:
 
@@ -143,7 +146,7 @@ The retry configuration uses exponential backoff: 500ms → 1000ms → 2000ms
    curl -X POST "http://localhost:8082/api/v1/trades" \
      -H "Content-Type: application/json" \
      -d '{
-       "tradeId": "RETRY-TEST-001",
+       "tradeId": "PASSIVE-HEALTH-001",
        "tradeType": "EQUITY",
        "instrument": "AAPL",
        "counterparty": "JPM",
@@ -153,23 +156,24 @@ The retry configuration uses exponential backoff: 500ms → 1000ms → 2000ms
      }'
    ```
 
-3. **Observe retry logs:**
+3. **Observe passive health and retry logs:**
    ```bash
-   docker logs -f server1 | grep -E "Retry|attempt"
+   docker logs -f server1 | grep -E "PASSIVE|UNHEALTHY|FAILOVER|retry"
    ```
 
 4. **Expected log pattern:**
    ```
-   INFO  - Retry attempt 1 for reference-lookup-service
-   INFO  - Waiting 500ms before retry
-   INFO  - Retry attempt 2 for reference-lookup-service
-   INFO  - Waiting 1000ms before retry
-   INFO  - Retry attempt 3 for reference-lookup-service
-   INFO  - Waiting 2000ms before retry
-   INFO  - Failover to remote instance on server3
+   WARN  - PASSIVE HEALTH: Instance reference-lookup:server1:8081 marked UNHEALTHY
+   INFO  - PASSIVE HEALTH FAILOVER: referenceLookup retry #1 - instance marked unhealthy, trying next
+   INFO  - Selected REMOTE instance for reference-lookup-service (load=0): reference-lookup:server3:8081
+   INFO  - Reference lookup successful (remote)
    ```
 
-5. **Restart service:**
+5. **Verify immediate failover time:**
+   - Total request latency should be < 500ms (vs 3+ seconds with traditional retry)
+   - No artificial delay between retry attempts
+
+6. **Restart service:**
    ```bash
    docker exec server1 supervisorctl start reference-lookup-service
    ```
@@ -331,45 +335,50 @@ Timeout configuration: 5 seconds per request
 
 ## Health Monitoring Testing
 
-### Background Health Check Verification
+### Background Health Check (Recovery Detection)
 
-Health monitor runs every 10 seconds by default.
+With the **Passive Health** pattern, the background health monitor focuses on **recovery detection**:
+- **Failure detection**: Handled by passive health (real-time, during requests)
+- **Recovery detection**: Handled by background health monitor (30-second interval)
 
 #### Test Steps:
 
 1. **Observe health check logs:**
    ```bash
-   docker logs -f server1 | grep -E "HealthMonitor|health check"
+   docker logs -f server1 | grep -E "HealthMonitor|RECOVERY"
 
-   # Expected pattern every 10 seconds:
-   # INFO - HealthMonitor: Checking instance health
+   # Expected pattern every 30 seconds:
+   # INFO - HealthMonitor: Checking instance health for recovery
    # INFO - HealthMonitor: reference-lookup-service@server1 - HEALTHY
    # INFO - HealthMonitor: reference-lookup-service@server3 - HEALTHY
    ```
 
-2. **Stop a service and observe status change:**
+2. **Stop a service and trigger passive health marking:**
    ```bash
    docker exec server3 supervisorctl stop reference-lookup-service
 
-   # Wait for next health check cycle (up to 10 seconds)
-   sleep 15
+   # Send a request to trigger passive health marking
+   curl -X POST "http://localhost:8082/api/v1/trades" \
+     -H "Content-Type: application/json" \
+     -d '{"tradeId":"HEALTH-TEST","tradeType":"EQUITY","instrument":"AAPL","counterparty":"JPM","quantity":100,"price":150.50,"currency":"USD"}'
 
-   docker logs server1 | tail -30 | grep -E "HealthMonitor"
+   docker logs server1 | tail -30 | grep -E "PASSIVE|UNHEALTHY"
 
-   # Expected:
-   # WARN - HealthMonitor: reference-lookup-service@server3 - UNHEALTHY
+   # Expected (immediate, during request):
+   # WARN - PASSIVE HEALTH: Instance reference-lookup:server3:8081 marked UNHEALTHY
    ```
 
-3. **Restart service and verify recovery:**
+3. **Restart service and verify recovery detection:**
    ```bash
    docker exec server3 supervisorctl start reference-lookup-service
 
-   sleep 15
+   # Wait for background health monitor to detect recovery (up to 30 seconds)
+   sleep 35
 
-   docker logs server1 | tail -30 | grep -E "HealthMonitor"
+   docker logs server1 | tail -30 | grep -E "RECOVERY|marked HEALTHY"
 
    # Expected:
-   # INFO - HealthMonitor: reference-lookup-service@server3 - HEALTHY
+   # INFO - RECOVERY: Instance reference-lookup:server3:8081 marked HEALTHY
    ```
 
 ---
@@ -438,19 +447,28 @@ docker compose -f docker/server3/docker-compose.yml up -d
 #### Successful Processing
 ```
 INFO - Received trade TRD-001
-INFO - LocalFirstLoadBalancer: Selected local instance
+DEBUG - Selected LOCAL instance for reference-lookup-service: reference-lookup:server1:8081
 INFO - Reference lookup successful for AAPL
 INFO - Eligibility check passed
 INFO - Trade TRD-001 processed successfully
 ```
 
-#### Retry in Progress
+#### Passive Health Failover
 ```
-WARN - Failed to connect to reference-lookup@server1
-INFO - Retry attempt 1, waiting 500ms
-INFO - Retry attempt 2, waiting 1000ms
-INFO - Failover to reference-lookup@server3
+WARN - PASSIVE HEALTH: Instance reference-lookup:server1:8081 marked UNHEALTHY
+INFO - PASSIVE HEALTH FAILOVER: referenceLookup retry #1 - instance marked unhealthy, trying next
+DEBUG - Skipping LOCAL instance reference-lookup:server1:8081 (already tried in this retry cycle)
+DEBUG - Selected REMOTE instance for reference-lookup-service (load=0): reference-lookup:server3:8081
+INFO - PASSIVE HEALTH: referenceLookup succeeded after 1 retries
 INFO - Reference lookup successful (remote)
+```
+
+#### All Instances Exhausted
+```
+WARN - PASSIVE HEALTH: Instance reference-lookup:server1:8081 marked UNHEALTHY
+WARN - PASSIVE HEALTH: Instance reference-lookup:server3:8081 marked UNHEALTHY
+ERROR - PASSIVE HEALTH: referenceLookup exhausted all 3 retries. Tried instances: [reference-lookup:server1:8081, reference-lookup:server3:8081]
+WARN - No healthy instances available for service: reference-lookup-service (tried: [...])
 ```
 
 #### Circuit Breaker Open
@@ -460,8 +478,9 @@ ERROR - Request rejected, circuit breaker preventing calls
 WARN - Returning fallback response
 ```
 
-#### Circuit Breaker Recovery
+#### Recovery Detection
 ```
+INFO - RECOVERY: Instance reference-lookup:server1:8081 marked HEALTHY
 INFO - CircuitBreaker 'referenceLookup' transitioning to HALF_OPEN
 INFO - Probe request to reference-lookup successful
 INFO - CircuitBreaker 'referenceLookup' transitioning to CLOSED

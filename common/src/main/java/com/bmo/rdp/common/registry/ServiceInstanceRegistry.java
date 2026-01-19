@@ -85,9 +85,55 @@ public class ServiceInstanceRegistry {
                 .filter(i -> i.getInstanceId().equals(instanceId))
                 .findFirst()
                 .ifPresent(i -> {
+                    boolean wasHealthy = i.isHealthy();
                     i.setHealthy(healthy);
-                    log.debug("Updated health for {}: {}", instanceId, healthy);
+                    // Log transitions at appropriate levels
+                    if (wasHealthy && !healthy) {
+                        log.warn("Instance {} marked UNHEALTHY (passive health update)", instanceId);
+                    } else if (!wasHealthy && healthy) {
+                        log.info("Instance {} recovered and marked HEALTHY", instanceId);
+                    } else {
+                        log.debug("Updated health for {}: {}", instanceId, healthy);
+                    }
                 });
+    }
+
+    /**
+     * Mark an instance as unhealthy (used by passive health pattern).
+     * Returns true if the instance was found and updated.
+     */
+    public boolean markUnhealthy(String serviceId, String instanceId) {
+        return getInstances(serviceId).stream()
+                .filter(i -> i.getInstanceId().equals(instanceId))
+                .findFirst()
+                .map(i -> {
+                    if (i.isHealthy()) {
+                        i.setHealthy(false);
+                        log.warn("PASSIVE HEALTH: Instance {} marked UNHEALTHY", instanceId);
+                        return true;
+                    }
+                    return false;
+                })
+                .orElse(false);
+    }
+
+    /**
+     * Mark an instance as healthy (used by health monitor recovery).
+     * Returns true if the instance was found and updated.
+     */
+    public boolean markHealthy(String serviceId, String instanceId) {
+        return getInstances(serviceId).stream()
+                .filter(i -> i.getInstanceId().equals(instanceId))
+                .findFirst()
+                .map(i -> {
+                    if (!i.isHealthy()) {
+                        i.setHealthy(true);
+                        log.info("RECOVERY: Instance {} marked HEALTHY", instanceId);
+                        return true;
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 
     /**
