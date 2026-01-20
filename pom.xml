@@ -26,6 +26,8 @@
         <module>check-eligible-service</module>
         <module>trade-receiver-service</module>
         <module>eq-trade-handler-service</module>
+        <!-- Performance tests module (run with: mvn verify -pl performance-tests -Phappy-path) -->
+        <module>performance-tests</module>
     </modules>
 
     <properties>

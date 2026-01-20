@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bmo.rdp</groupId>
+        <artifactId>rdp-msa-viability-poc</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>performance-tests</artifactId>
+    <packaging>pom</packaging>
+    <name>Performance Tests</name>
+    <description>JMeter performance tests for RDP MSA POC</description>
+
+    <properties>
+        <jmeter.maven.plugin.version>3.8.0</jmeter.maven.plugin.version>
+        <!-- Target configuration -->
+        <target.host>localhost</target.host>
+        <target.port>8082</target.port>
+        <!-- Load configuration -->
+        <threads>50</threads>
+        <rampup>10</rampup>
+        <duration>60</duration>
+        <target.rps>50</target.rps>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.lazerycode.jmeter</groupId>
+                <artifactId>jmeter-maven-plugin</artifactId>
+                <version>${jmeter.maven.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>configuration</id>
+                        <goals>
+                            <goal>configure</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jmeter-tests</id>
+                        <goals>
+                            <goal>jmeter</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jmeter-check-results</id>
+                        <goals>
+                            <goal>results</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <testFilesDirectory>${project.basedir}/src/test/jmeter</testFilesDirectory>
+                    <resultsDirectory>${project.build.directory}/jmeter/results</resultsDirectory>
+                    <generateReports>true</generateReports>
+                    <reportDirectory>${project.build.directory}/jmeter/reports</reportDirectory>
+                    <ignoreResultFailures>true</ignoreResultFailures>
+                    <propertiesUser>
+                        <target.host>${target.host}</target.host>
+                        <target.port>${target.port}</target.port>
+                        <threads>${threads}</threads>
+                        <rampup>${rampup}</rampup>
+                        <duration>${duration}</duration>
+                        <target.rps>${target.rps}</target.rps>
+                    </propertiesUser>
+                    <jmeterExtensions>
+                        <!-- Throughput Shaping Timer for precise RPS control -->
+                        <artifact>kg.apc:jmeter-plugins-tst:2.6</artifact>
+                        <!-- Custom Thread Groups -->
+                        <artifact>kg.apc:jmeter-plugins-casutg:2.10</artifact>
+                    </jmeterExtensions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Happy Path Test Profile -->
+        <profile>
+            <id>happy-path</id>
+            <properties>
+                <threads>50</threads>
+                <rampup>10</rampup>
+                <duration>60</duration>
+                <target.rps>50</target.rps>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.lazerycode.jmeter</groupId>
+                        <artifactId>jmeter-maven-plugin</artifactId>
+                        <configuration>
+                            <testFilesIncluded>
+                                <jMeterTestFile>happy-path-test.jmx</jMeterTestFile>
+                            </testFilesIncluded>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Local Failure Test Profile -->
+        <profile>
+            <id>local-failure</id>
+            <properties>
+                <threads>20</threads>
+                <rampup>5</rampup>
+                <duration>60</duration>
+                <target.rps>20</target.rps>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.lazerycode.jmeter</groupId>
+                        <artifactId>jmeter-maven-plugin</artifactId>
+                        <configuration>
+                            <testFilesIncluded>
+                                <jMeterTestFile>local-failure-test.jmx</jMeterTestFile>
+                            </testFilesIncluded>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Remote Failure Test Profile -->
+        <profile>
+            <id>remote-failure</id>
+            <properties>
+                <threads>20</threads>
+                <rampup>5</rampup>
+                <duration>60</duration>
+                <target.rps>20</target.rps>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.lazerycode.jmeter</groupId>
+                        <artifactId>jmeter-maven-plugin</artifactId>
+                        <configuration>
+                            <testFilesIncluded>
+                                <jMeterTestFile>remote-failure-test.jmx</jMeterTestFile>
+                            </testFilesIncluded>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- All Tests Profile -->
+        <profile>
+            <id>all-tests</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+
+        <!-- Stress Test Profile (higher load) -->
+        <profile>
+            <id>stress</id>
+            <properties>
+                <threads>100</threads>
+                <rampup>20</rampup>
+                <duration>120</duration>
+                <target.rps>100</target.rps>
+            </properties>
+        </profile>
+    </profiles>
+</project>
